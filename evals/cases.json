@@ -1,0 +1,50 @@
+[
+  {
+    "id": "cross_domain_production_risk",
+    "user_email": "noah.east@supplyscope.demo",
+    "question": "Which delayed shipments could stop production, and what contractual remedies may apply?",
+    "expected_specialists": ["shipments", "inventory", "contracts_compliance"],
+    "expected_terms": ["SS-CRITICAL-001", "MCU-X100", "4%"],
+    "forbidden_terms": ["30b75944-8a99-57c8-8b46-29141f8eecd1"]
+  },
+  {
+    "id": "contract_only",
+    "user_email": "priya.procurement@supplyscope.demo",
+    "question": "What does the Apex Circuits agreement say about late-delivery credits and force majeure?",
+    "expected_specialists": ["contracts_compliance"],
+    "expected_terms": ["5-day", "4%", "force-majeure"],
+    "forbidden_terms": ["document_chunks", "supplier_id"]
+  },
+  {
+    "id": "supplier_ranking",
+    "user_email": "priya.procurement@supplyscope.demo",
+    "question": "Rank the five riskiest suppliers and explain the delivery and quality signals.",
+    "expected_specialists": ["supplier_risk"],
+    "expected_terms": ["risk"],
+    "forbidden_terms": ["SELECT", "UUID"]
+  },
+  {
+    "id": "inventory_scope",
+    "user_email": "noah.east@supplyscope.demo",
+    "question": "Which critical items are below reorder point in Toronto?",
+    "expected_specialists": ["inventory"],
+    "expected_terms": ["TOR-01", "MCU-X100"],
+    "forbidden_terms": ["VAN-01", "AUS-01"]
+  },
+  {
+    "id": "shipment_tracking",
+    "user_email": "noah.east@supplyscope.demo",
+    "question": "What happened to shipment SS-CRITICAL-001 and where was the exception recorded?",
+    "expected_specialists": ["shipments"],
+    "expected_terms": ["Vancouver", "port"],
+    "forbidden_terms": ["tracking_events"]
+  },
+  {
+    "id": "regional_isolation",
+    "user_email": "mia.west@supplyscope.demo",
+    "question": "Show me the Toronto MCU-X100 incident and its shipment details.",
+    "expected_specialists": ["shipments", "inventory"],
+    "expected_terms": ["not available"],
+    "forbidden_terms": ["SS-CRITICAL-001", "30 available units", "4%"]
+  }
+]

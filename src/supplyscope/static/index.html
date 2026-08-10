@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SupplyScope Operations Console</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <div>
+            <strong>SupplyScope</strong>
+            <span>Operations console</span>
+          </div>
+        </div>
+        <div class="runtime-status" id="runtime-status" aria-live="polite">
+          <span class="status-dot"></span>
+          <span>Connecting</span>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <label for="persona-select">Operating as</label>
+        <select id="persona-select" aria-label="Select a synthetic user"></select>
+        <div class="scope-block">
+          <span class="section-label">Role</span>
+          <strong id="persona-role">Loading</strong>
+          <span id="persona-email"></span>
+        </div>
+        <button class="secondary-command" id="new-conversation" type="button">
+          New conversation
+        </button>
+        <div class="prompt-list">
+          <span class="section-label">Operations queue</span>
+          <button class="prompt-option" type="button">
+            Which delayed shipments threaten production?
+          </button>
+          <button class="prompt-option" type="button">
+            Rank suppliers by operational risk.
+          </button>
+          <button class="prompt-option" type="button">
+            What does the Apex contract say about late delivery?
+          </button>
+          <button class="prompt-option" type="button">
+            Show critical low-stock items in Toronto.
+          </button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <div class="workspace-heading">
+          <div>
+            <span class="section-label">Control tower</span>
+            <h1>Operational inquiry</h1>
+          </div>
+          <button class="text-command" id="run-demo" type="button">Run local scenario</button>
+        </div>
+
+        <section class="message-stream" id="message-stream" aria-live="polite">
+          <div class="empty-state" id="empty-state">
+            <strong>Ask across shipments, inventory, suppliers, and contracts.</strong>
+            <span>Answers retain record references and retrieved document citations.</span>
+          </div>
+        </section>
+
+        <form class="composer" id="chat-form">
+          <textarea
+            id="question-input"
+            rows="2"
+            maxlength="4000"
+            placeholder="Ask an operations question"
+            aria-label="Operations question"
+          ></textarea>
+          <button id="send-button" type="submit">Send</button>
+        </form>
+      </main>
+
+      <aside class="evidence-panel">
+        <div class="evidence-heading">
+          <div>
+            <span class="section-label">Run evidence</span>
+            <h2>Specialist activity</h2>
+          </div>
+          <span class="event-count" id="event-count">0</span>
+        </div>
+        <div class="evidence-content" id="evidence-content">
+          <p>Tool calls and citations will appear here.</p>
+        </div>
+      </aside>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

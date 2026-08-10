@@ -1,0 +1,77 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SupplyScope: Debug Web (SQLite)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "supplyscope.web",
+      "args": [
+        "--database-url",
+        "sqlite:///./supplyscope.db",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "SupplyScope: Debug Offline Demo",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "supplyscope.cli",
+      "args": [
+        "--database-url",
+        "sqlite:///./supplyscope.db",
+        "demo",
+        "--trace"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "SupplyScope: Debug LLM Question",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "supplyscope.cli",
+      "args": [
+        "--database-url",
+        "sqlite:///./supplyscope.db",
+        "ask",
+        "${input:debugQuestion}",
+        "--user",
+        "${input:debugPersona}",
+        "--trace"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "debugQuestion",
+      "type": "promptString",
+      "description": "Question for the SupplyScope supervisor",
+      "default": "Which delayed shipments could stop production, and what contractual remedies apply?"
+    },
+    {
+      "id": "debugPersona",
+      "type": "pickString",
+      "description": "Synthetic user whose deterministic access scope should be used",
+      "default": "noah.east@supplyscope.demo",
+      "options": [
+        "noah.east@supplyscope.demo",
+        "mia.west@supplyscope.demo",
+        "priya.procurement@supplyscope.demo",
+        "leo.quality@supplyscope.demo",
+        "sofia.viewer@supplyscope.demo",
+        "ava.admin@supplyscope.demo"
+      ]
+    }
+  ]
+}
