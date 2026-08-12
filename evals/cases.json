@@ -1,7 +1,7 @@
 [
   {
     "id": "cross_domain_production_risk",
-    "user_email": "noah.east@supplyscope.demo",
+    "user_email": "noah.east@controltower.demo",
     "question": "Which delayed shipments could stop production, and what contractual remedies may apply?",
     "expected_specialists": ["shipments", "inventory", "contracts_compliance"],
     "expected_terms": ["SS-CRITICAL-001", "MCU-X100", "4%"],
@@ -9,7 +9,7 @@
   },
   {
     "id": "contract_only",
-    "user_email": "priya.procurement@supplyscope.demo",
+    "user_email": "priya.procurement@controltower.demo",
     "question": "What does the Apex Circuits agreement say about late-delivery credits and force majeure?",
     "expected_specialists": ["contracts_compliance"],
     "expected_terms": ["5-day", "4%", "force-majeure"],
@@ -17,7 +17,7 @@
   },
   {
     "id": "supplier_ranking",
-    "user_email": "priya.procurement@supplyscope.demo",
+    "user_email": "priya.procurement@controltower.demo",
     "question": "Rank the five riskiest suppliers and explain the delivery and quality signals.",
     "expected_specialists": ["supplier_risk"],
     "expected_terms": ["risk"],
@@ -25,7 +25,7 @@
   },
   {
     "id": "inventory_scope",
-    "user_email": "noah.east@supplyscope.demo",
+    "user_email": "noah.east@controltower.demo",
     "question": "Which critical items are below reorder point in Toronto?",
     "expected_specialists": ["inventory"],
     "expected_terms": ["TOR-01", "MCU-X100"],
@@ -33,7 +33,7 @@
   },
   {
     "id": "shipment_tracking",
-    "user_email": "noah.east@supplyscope.demo",
+    "user_email": "noah.east@controltower.demo",
     "question": "What happened to shipment SS-CRITICAL-001 and where was the exception recorded?",
     "expected_specialists": ["shipments"],
     "expected_terms": ["Vancouver", "port"],
@@ -41,10 +41,19 @@
   },
   {
     "id": "regional_isolation",
-    "user_email": "mia.west@supplyscope.demo",
+    "user_email": "mia.west@controltower.demo",
     "question": "Show me the Toronto MCU-X100 incident and its shipment details.",
     "expected_specialists": ["shipments", "inventory"],
     "expected_terms": ["not available"],
     "forbidden_terms": ["SS-CRITICAL-001", "30 available units", "4%"]
+  },
+  {
+    "id": "external_vancouver_disruption",
+    "user_email": "noah.east@controltower.demo",
+    "question": "Use external disruption intelligence to explain what may be worsening shipment SS-CRITICAL-001 and separate confirmed tracking facts from correlated external signals.",
+    "expected_specialists": ["shipments"],
+    "expected_terms": ["SS-CRITICAL-001", "Vancouver", "external-risk:EXT-2026-001"],
+    "expected_evidence_sources": ["postgresql", "mcp"],
+    "forbidden_terms": ["supplier_id", "warehouse_id"]
   }
 ]

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessService
-from supplyscope.agents.specialists import (
+from control_tower.access import AccessService
+from control_tower.agents.specialists import (
     DocumentSpecialist,
     InventorySpecialist,
     ShipmentSpecialist,
 )
-from supplyscope.agents.supervisor import SupplyRiskSupervisor
-from supplyscope.synthetic import DEMO_AS_OF
-from supplyscope.tools import DocumentTools, InventoryTools, ShipmentTools
+from control_tower.agents.supervisor import SupplyRiskSupervisor
+from control_tower.synthetic import DEMO_AS_OF
+from control_tower.tools import DocumentTools, InventoryTools, ShipmentTools
 
 QUESTION = (
     "Which delayed shipments could stop production, and do the responsible supplier "
@@ -28,7 +28,7 @@ def build_supervisor(session: Session) -> SupplyRiskSupervisor:
 
 def test_supervisor_combines_structured_and_document_findings(session: Session) -> None:
     access = AccessService(session).resolve(
-        "noah.east@supplyscope.demo",
+        "noah.east@controltower.demo",
         "meridian-assembly",
     )
 
@@ -45,7 +45,7 @@ def test_supervisor_combines_structured_and_document_findings(session: Session) 
 
 def test_supervisor_result_respects_regional_scope(session: Session) -> None:
     access = AccessService(session).resolve(
-        "mia.west@supplyscope.demo",
+        "mia.west@controltower.demo",
         "meridian-assembly",
     )
 

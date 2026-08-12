@@ -3,13 +3,13 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessDeniedError, AccessService
-from supplyscope.analytics import ShipmentAnalytics, SupplierRiskAnalytics
+from control_tower.access import AccessDeniedError, AccessService
+from control_tower.analytics import ShipmentAnalytics, SupplierRiskAnalytics
 
 
 def test_supplier_risk_ranking_has_explainable_metrics(session: Session) -> None:
     access = AccessService(session).resolve(
-        "priya.procurement@supplyscope.demo",
+        "priya.procurement@controltower.demo",
         "meridian-assembly",
     )
 
@@ -23,7 +23,7 @@ def test_supplier_risk_ranking_has_explainable_metrics(session: Session) -> None
 
 def test_tracking_history_enforces_warehouse_scope(session: Session) -> None:
     access = AccessService(session).resolve(
-        "mia.west@supplyscope.demo",
+        "mia.west@controltower.demo",
         "meridian-assembly",
     )
 

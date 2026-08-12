@@ -7,8 +7,8 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessContext
-from supplyscope.models import (
+from control_tower.access import AccessContext
+from control_tower.models import (
     InventorySnapshot,
     Product,
     PurchaseOrder,
@@ -18,7 +18,7 @@ from supplyscope.models import (
     TrackingEvent,
     Warehouse,
 )
-from supplyscope.tools import SupplierTools
+from control_tower.tools import SupplierTools
 
 
 class ScopeResolver:

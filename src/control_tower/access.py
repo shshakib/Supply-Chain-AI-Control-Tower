@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from supplyscope.models import (
+from control_tower.models import (
     Membership,
     MembershipWarehouse,
     Organization,

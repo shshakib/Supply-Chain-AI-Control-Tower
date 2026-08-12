@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from supplyscope.database import create_database_engine, create_schema
-from supplyscope.synthetic import SyntheticDataGenerator
+from control_tower.database import create_database_engine, create_schema
+from control_tower.synthetic import SyntheticDataGenerator
 
 
 @pytest.fixture(scope="session")

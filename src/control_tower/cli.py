@@ -8,22 +8,23 @@ from datetime import date
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessService
-from supplyscope.agent_service import AgentService, MissingOpenAIConfiguration
-from supplyscope.agents.specialists import (
+from control_tower.access import AccessContext, AccessService
+from control_tower.agent_service import AgentService, MissingOpenAIConfiguration
+from control_tower.agents.specialists import (
     DocumentSpecialist,
     InventorySpecialist,
     ShipmentSpecialist,
 )
-from supplyscope.agents.supervisor import SupplyRiskSupervisor
-from supplyscope.config import get_settings
-from supplyscope.database import create_database_engine, create_schema, session_scope
-from supplyscope.embeddings import EmbeddingIndexer, OpenAIEmbeddingProvider
-from supplyscope.evaluation import DEFAULT_CASES_PATH, run_evaluations
-from supplyscope.models import Membership, Organization, User
-from supplyscope.synthetic import DEMO_AS_OF, SyntheticDataGenerator
-from supplyscope.tools import DocumentTools, InventoryTools, ShipmentTools
+from control_tower.agents.supervisor import SupplyRiskSupervisor
+from control_tower.config import get_settings
+from control_tower.database import create_database_engine, create_schema, session_scope
+from control_tower.embeddings import EmbeddingIndexer, OpenAIEmbeddingProvider
+from control_tower.evaluation import DEFAULT_CASES_PATH, run_evaluations
+from control_tower.models import Membership, Organization, User
+from control_tower.synthetic import DEMO_AS_OF, SyntheticDataGenerator
+from control_tower.tools import DocumentTools, InventoryTools, ShipmentTools
 
 DEFAULT_QUESTION = (
     "Which delayed shipments could stop production, and do the responsible supplier "
@@ -31,8 +32,25 @@ DEFAULT_QUESTION = (
 )
 
 
+async def ask_with_integrations(
+    settings,
+    session: Session,
+    access: AccessContext,
+    *,
+    question: str,
+    as_of: date,
+):
+    async with AgentService(settings) as service:
+        return await service.ask(
+            session,
+            access,
+            question=question,
+            as_of=as_of,
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="supplyscope")
+    parser = argparse.ArgumentParser(prog="control-tower")
     parser.add_argument(
         "--database-url",
         help="Override DATABASE_URL, which is useful for local SQLite smoke tests.",
@@ -55,14 +73,14 @@ def build_parser() -> argparse.ArgumentParser:
     index_parser.add_argument("--force", action="store_true")
 
     demo_parser = subparsers.add_parser("demo", help="Run the multi-specialist risk workflow.")
-    demo_parser.add_argument("--user", default="noah.east@supplyscope.demo")
+    demo_parser.add_argument("--user", default="noah.east@controltower.demo")
     demo_parser.add_argument("--as-of", type=date.fromisoformat, default=DEMO_AS_OF)
     demo_parser.add_argument("--question", default=DEFAULT_QUESTION)
     demo_parser.add_argument("--trace", action="store_true")
 
     ask_parser = subparsers.add_parser("ask", help="Ask the LLM supervisor a question.")
     ask_parser.add_argument("question")
-    ask_parser.add_argument("--user", default="noah.east@supplyscope.demo")
+    ask_parser.add_argument("--user", default="noah.east@controltower.demo")
     ask_parser.add_argument("--as-of", type=date.fromisoformat, default=DEMO_AS_OF)
     ask_parser.add_argument("--trace", action="store_true")
     ask_parser.add_argument("--json-output", action="store_true")
@@ -83,7 +101,7 @@ def main() -> None:
 
     if args.command == "init-db":
         create_schema(engine)
-        print("SupplyScope database schema is ready.")
+        print("Supply Chain AI Control Tower database schema is ready.")
         return
 
     if args.command == "seed":
@@ -146,7 +164,8 @@ def main() -> None:
         if args.command == "ask":
             try:
                 response = asyncio.run(
-                    AgentService(settings).ask(
+                    ask_with_integrations(
+                        settings,
                         session,
                         access,
                         question=args.question,

@@ -2,13 +2,28 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "SupplyScope: Debug Web (SQLite)",
+      "name": "Supply Chain AI Control Tower: Debug External Risk MCP",
       "type": "debugpy",
       "request": "launch",
-      "module": "supplyscope.web",
+      "module": "control_tower.integrations.risk_mcp_server",
+      "args": [
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8010"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Supply Chain AI Control Tower: Debug Web (SQLite)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "control_tower.web",
       "args": [
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "--host",
         "127.0.0.1",
         "--port",
@@ -19,13 +34,13 @@
       "justMyCode": true
     },
     {
-      "name": "SupplyScope: Debug Offline Demo",
+      "name": "Supply Chain AI Control Tower: Debug Offline Demo",
       "type": "debugpy",
       "request": "launch",
-      "module": "supplyscope.cli",
+      "module": "control_tower.cli",
       "args": [
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "demo",
         "--trace"
       ],
@@ -34,13 +49,13 @@
       "justMyCode": true
     },
     {
-      "name": "SupplyScope: Debug LLM Question",
+      "name": "Supply Chain AI Control Tower: Debug LLM Question",
       "type": "debugpy",
       "request": "launch",
-      "module": "supplyscope.cli",
+      "module": "control_tower.cli",
       "args": [
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "ask",
         "${input:debugQuestion}",
         "--user",
@@ -52,25 +67,35 @@
       "justMyCode": true
     }
   ],
+  "compounds": [
+    {
+      "name": "Supply Chain AI Control Tower: Debug Full Local Stack",
+      "configurations": [
+        "Supply Chain AI Control Tower: Debug External Risk MCP",
+        "Supply Chain AI Control Tower: Debug Web (SQLite)"
+      ],
+      "stopAll": true
+    }
+  ],
   "inputs": [
     {
       "id": "debugQuestion",
       "type": "promptString",
-      "description": "Question for the SupplyScope supervisor",
+      "description": "Question for the Supply Chain AI Control Tower supervisor",
       "default": "Which delayed shipments could stop production, and what contractual remedies apply?"
     },
     {
       "id": "debugPersona",
       "type": "pickString",
       "description": "Synthetic user whose deterministic access scope should be used",
-      "default": "noah.east@supplyscope.demo",
+      "default": "noah.east@controltower.demo",
       "options": [
-        "noah.east@supplyscope.demo",
-        "mia.west@supplyscope.demo",
-        "priya.procurement@supplyscope.demo",
-        "leo.quality@supplyscope.demo",
-        "sofia.viewer@supplyscope.demo",
-        "ava.admin@supplyscope.demo"
+        "noah.east@controltower.demo",
+        "mia.west@controltower.demo",
+        "priya.procurement@controltower.demo",
+        "leo.quality@controltower.demo",
+        "sofia.viewer@controltower.demo",
+        "ava.admin@controltower.demo"
       ]
     }
   ]

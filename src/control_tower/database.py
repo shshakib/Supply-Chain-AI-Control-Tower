@@ -7,8 +7,8 @@ from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from supplyscope.config import get_settings
-from supplyscope.models import Base
+from control_tower.config import get_settings
+from control_tower.models import Base
 
 
 def create_database_engine(database_url: str | None = None) -> Engine:

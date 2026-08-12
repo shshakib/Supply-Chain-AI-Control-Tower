@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessContext
-from supplyscope.analytics import ScopeResolver
-from supplyscope.models import Warehouse
-from supplyscope.retrieval import HybridDocumentRetriever
+from control_tower.access import AccessContext
+from control_tower.analytics import ScopeResolver
+from control_tower.models import Warehouse
+from control_tower.observability import ExecutionTrace
+from control_tower.retrieval import HybridDocumentRetriever
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class ToolEvent:
     arguments: dict[str, Any]
     result_count: int
     occurred_at: str
+    source: Literal["postgresql", "pgvector", "mcp"] = "postgresql"
 
 
 @dataclass
@@ -28,6 +30,7 @@ class AgentRuntime:
     access: AccessContext
     as_of: date
     retriever: HybridDocumentRetriever
+    trace: ExecutionTrace | None = None
     events: list[ToolEvent] = field(default_factory=list)
 
     @property
@@ -52,6 +55,7 @@ class AgentRuntime:
         tool: str,
         arguments: dict[str, Any],
         result_count: int,
+        source: Literal["postgresql", "pgvector", "mcp"] = "postgresql",
     ) -> None:
         self.events.append(
             ToolEvent(
@@ -60,5 +64,6 @@ class AgentRuntime:
                 arguments=arguments,
                 result_count=result_count,
                 occurred_at=datetime.now(UTC).isoformat(),
+                source=source,
             )
         )

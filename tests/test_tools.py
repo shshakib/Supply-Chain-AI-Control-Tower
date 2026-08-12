@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessService
-from supplyscope.synthetic import DEMO_AS_OF
-from supplyscope.tools import DocumentTools, InventoryTools, ShipmentTools
+from control_tower.access import AccessService
+from control_tower.synthetic import DEMO_AS_OF
+from control_tower.tools import DocumentTools, InventoryTools, ShipmentTools
 
 
 def test_east_persona_can_see_correlated_critical_scenario(session: Session) -> None:
     access = AccessService(session).resolve(
-        "noah.east@supplyscope.demo",
+        "noah.east@controltower.demo",
         "meridian-assembly",
     )
 
@@ -33,11 +33,13 @@ def test_east_persona_can_see_correlated_critical_scenario(session: Session) -> 
     assert mcu_risk.days_of_cover == 3.8
     assert critical_shipment.delay_days == 9
     assert critical_shipment.supplier_name == "Apex Circuits"
+    assert all(item.delay_days > 0 for item in shipments)
+    assert all(item.delay_reason for item in shipments)
 
 
 def test_west_persona_cannot_retrieve_east_incident_document(session: Session) -> None:
     access = AccessService(session).resolve(
-        "mia.west@supplyscope.demo",
+        "mia.west@controltower.demo",
         "meridian-assembly",
     )
 

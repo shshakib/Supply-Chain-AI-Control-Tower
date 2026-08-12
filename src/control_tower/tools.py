@@ -7,8 +7,8 @@ from datetime import date, timedelta
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessContext, AccessDeniedError
-from supplyscope.models import (
+from control_tower.access import AccessContext, AccessDeniedError
+from control_tower.models import (
     Document,
     DocumentChunk,
     InventorySnapshot,
@@ -115,7 +115,45 @@ class ShipmentTools:
             .order_by(Shipment.delay_days.desc(), Shipment.estimated_arrival)
         ).all()
 
-        return [DelayedShipment(*row) for row in rows]
+        delayed_shipments = []
+        for row in rows:
+            (
+                tracking_number,
+                purchase_order,
+                supplier_id,
+                supplier_code,
+                supplier_name,
+                warehouse_code,
+                sku,
+                product_name,
+                quantity,
+                estimated_arrival,
+                recorded_delay_days,
+                recorded_delay_reason,
+            ) = row
+            overdue_days = max((as_of - estimated_arrival).days, 0)
+            effective_delay_days = max(recorded_delay_days, overdue_days)
+            delay_reason = recorded_delay_reason
+            if delay_reason is None and overdue_days:
+                delay_reason = "Estimated arrival passed without a delivery event"
+
+            delayed_shipments.append(
+                DelayedShipment(
+                    tracking_number=tracking_number,
+                    purchase_order=purchase_order,
+                    supplier_id=supplier_id,
+                    supplier_code=supplier_code,
+                    supplier_name=supplier_name,
+                    warehouse_code=warehouse_code,
+                    sku=sku,
+                    product_name=product_name,
+                    quantity=quantity,
+                    estimated_arrival=estimated_arrival,
+                    delay_days=effective_delay_days,
+                    delay_reason=delay_reason,
+                )
+            )
+        return delayed_shipments
 
 
 class InventoryTools:

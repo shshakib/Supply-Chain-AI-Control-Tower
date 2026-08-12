@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111c24">
+    <title>Supply Chain AI Control Tower Operations Console</title>
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem("control-tower-theme");
+          const systemTheme = matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+          document.documentElement.dataset.theme = savedTheme || systemTheme;
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/static/styles.css?v=0.6.0">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <div>
+            <strong>Supply Chain AI Control Tower</strong>
+            <span>Operations console</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="runtime-status" id="runtime-status" aria-live="polite">
+            <span class="status-dot"></span>
+            <span>Connecting</span>
+          </div>
+          <button
+            class="theme-toggle"
+            id="theme-toggle"
+            type="button"
+            aria-label="Switch to dark mode"
+            aria-pressed="false"
+            title="Switch to dark mode"
+          >
+            <span class="theme-icon theme-icon-sun" aria-hidden="true">&#9788;</span>
+            <span class="theme-icon theme-icon-moon" aria-hidden="true">&#9790;</span>
+          </button>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <label for="persona-select">Operating as</label>
+        <select id="persona-select" aria-label="Select a synthetic user"></select>
+        <div class="scope-block">
+          <span class="section-label">Role</span>
+          <strong id="persona-role">Loading</strong>
+          <span id="persona-email"></span>
+        </div>
+        <button class="secondary-command" id="new-conversation" type="button">
+          New conversation
+        </button>
+        <div class="prompt-list">
+          <span class="section-label">Suggested inquiries</span>
+          <button class="prompt-option" type="button">
+            Which delayed shipments threaten production, and are external disruptions involved?
+          </button>
+          <button class="prompt-option" type="button">
+            Rank suppliers by operational risk.
+          </button>
+          <button class="prompt-option" type="button">
+            What does the Apex contract say about late delivery?
+          </button>
+          <button class="prompt-option" type="button">
+            Show critical low-stock items in Toronto.
+          </button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <div class="workspace-heading">
+          <div>
+            <span class="section-label">Control tower</span>
+            <h1>Operational inquiry</h1>
+          </div>
+          <div class="workspace-actions">
+            <button class="text-command" id="run-demo" type="button">Run offline scenario</button>
+            <button
+              class="secondary-command trace-toggle"
+              id="trace-toggle"
+              type="button"
+              aria-controls="trace-panel"
+              aria-expanded="false"
+            >
+              Live trace
+            </button>
+          </div>
+        </div>
+
+        <section class="message-stream" id="message-stream" aria-live="polite">
+          <div class="empty-state" id="empty-state">
+            <strong>Ask across shipments, inventory, suppliers, and contracts.</strong>
+            <span>Answers retain operational, document, and external-risk references.</span>
+          </div>
+        </section>
+
+        <form class="composer" id="chat-form">
+          <textarea
+            id="question-input"
+            rows="2"
+            maxlength="4000"
+            placeholder="Ask an operations question"
+            aria-label="Operations question"
+          ></textarea>
+          <button id="send-button" type="submit">Send</button>
+        </form>
+      </main>
+
+      <button
+        class="trace-scrim"
+        id="trace-scrim"
+        type="button"
+        aria-label="Close execution trace"
+      ></button>
+
+      <aside class="evidence-panel" id="trace-panel" aria-label="Live execution trace">
+        <div class="evidence-heading">
+          <div>
+            <span class="section-label">Observability</span>
+            <h2>Live execution trace</h2>
+          </div>
+          <div class="trace-heading-actions">
+            <span class="event-count" id="event-count">0</span>
+            <button
+              class="trace-close"
+              id="trace-close"
+              type="button"
+              aria-label="Close execution trace"
+              title="Close execution trace"
+            >&times;</button>
+          </div>
+        </div>
+        <div class="source-status" aria-label="Data service status">
+          <div class="service-row" id="database-service">
+            <span><span class="service-dot"></span>Operational database</span>
+            <strong id="database-status">Checking</strong>
+          </div>
+          <div class="service-row" id="retrieval-service">
+            <span><span class="service-dot"></span>Contract retrieval</span>
+            <strong id="retrieval-status">Checking</strong>
+          </div>
+          <div class="service-row" id="mcp-service">
+            <span><span class="service-dot"></span>External risk MCP</span>
+            <strong id="mcp-status">Checking</strong>
+          </div>
+        </div>
+
+        <div class="trace-tabs" role="tablist" aria-label="Execution trace views">
+          <button
+            class="trace-tab active"
+            id="map-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="map-view"
+            data-view="map"
+          >Map</button>
+          <button
+            class="trace-tab"
+            id="timeline-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="timeline-view"
+            data-view="timeline"
+          >Timeline</button>
+          <button
+            class="trace-tab"
+            id="evidence-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="evidence-view"
+            data-view="evidence"
+          >Evidence</button>
+        </div>
+
+        <div class="trace-views">
+          <section
+            class="trace-view active"
+            id="map-view"
+            role="tabpanel"
+            aria-labelledby="map-tab"
+            data-view-panel="map"
+          >
+            <div class="trace-run-state">
+              <span class="trace-run-dot" id="trace-run-dot"></span>
+              <div>
+                <strong id="trace-run-label">Ready</strong>
+                <span id="trace-run-meta">No active run</span>
+              </div>
+            </div>
+
+            <div class="execution-map" id="execution-map">
+              <button class="trace-node" type="button" data-node="request">
+                <span class="node-indicator"></span>
+                <span class="node-label">Question</span>
+                <span class="node-meta">Request</span>
+              </button>
+              <span class="trace-connector" data-flow="access" aria-hidden="true"></span>
+              <button class="trace-node" type="button" data-node="access">
+                <span class="node-indicator"></span>
+                <span class="node-label">Access scope</span>
+                <span class="node-meta">Deterministic</span>
+              </button>
+              <span class="trace-connector" data-flow="supervisor" aria-hidden="true"></span>
+              <button class="trace-node" type="button" data-node="supervisor">
+                <span class="node-indicator"></span>
+                <span class="node-label">Supervisor</span>
+                <span class="node-meta">Router</span>
+              </button>
+
+              <span class="trace-connector" data-flow="specialists" aria-hidden="true"></span>
+              <span class="map-group-label">Specialists</span>
+              <div class="trace-node-grid specialists-grid">
+                <button class="trace-node compact" type="button" data-node="shipments">
+                  <span class="node-indicator"></span>
+                  <span class="node-label">Shipments</span>
+                  <span class="node-meta">Agent</span>
+                </button>
+                <button class="trace-node compact" type="button" data-node="inventory">
+                  <span class="node-indicator"></span>
+                  <span class="node-label">Inventory</span>
+                  <span class="node-meta">Agent</span>
+                </button>
+                <button class="trace-node compact" type="button" data-node="supplier_risk">
+                  <span class="node-indicator"></span>
+                  <span class="node-label">Supplier risk</span>
+                  <span class="node-meta">Agent</span>
+                </button>
+                <button
+                  class="trace-node compact"
+                  type="button"
+                  data-node="contracts_compliance"
+                >
+                  <span class="node-indicator"></span>
+                  <span class="node-label">Contracts</span>
+                  <span class="node-meta">Agent</span>
+                </button>
+              </div>
+
+              <span class="trace-connector" data-flow="sources" aria-hidden="true"></span>
+              <span class="map-group-label">Evidence sources</span>
+              <div class="trace-node-grid source-grid">
+                <button class="trace-node compact" type="button" data-node="postgresql">
+                  <span class="node-indicator"></span>
+                  <span class="node-label">PostgreSQL</span>
+                  <span class="node-meta">Typed tools</span>
+                </button>
+                <button class="trace-node compact" type="button" data-node="pgvector">
+                  <span class="node-indicator"></span>
+                  <span class="node-label">RAG</span>
+                  <span class="node-meta">Retrieval</span>
+                </button>
+                <button class="trace-node compact" type="button" data-node="mcp">
+                  <span class="node-indicator"></span>
+                  <span class="node-label">MCP</span>
+                  <span class="node-meta">External risk</span>
+                </button>
+              </div>
+
+              <span class="trace-connector" data-flow="synthesis" aria-hidden="true"></span>
+              <button class="trace-node" type="button" data-node="synthesis">
+                <span class="node-indicator"></span>
+                <span class="node-label">Synthesis</span>
+                <span class="node-meta">Final composition</span>
+              </button>
+              <span class="trace-connector" data-flow="answer" aria-hidden="true"></span>
+              <button class="trace-node" type="button" data-node="answer">
+                <span class="node-indicator"></span>
+                <span class="node-label">Answer</span>
+                <span class="node-meta">Cited output</span>
+              </button>
+            </div>
+
+            <div class="exchange-inspector" id="exchange-inspector">
+              <div class="exchange-heading">
+                <span class="section-label">Selected exchange</span>
+                <span class="exchange-status" id="exchange-status">Idle</span>
+              </div>
+              <strong id="exchange-title">No exchange selected</strong>
+              <span id="exchange-meta">Run a query to populate the trace.</span>
+              <div class="exchange-details" id="exchange-details"></div>
+            </div>
+          </section>
+
+          <section
+            class="trace-view"
+            id="timeline-view"
+            role="tabpanel"
+            aria-labelledby="timeline-tab"
+            data-view-panel="timeline"
+            hidden
+          >
+            <div class="timeline-list" id="timeline-list">
+              <p>No execution events yet.</p>
+            </div>
+          </section>
+
+          <section
+            class="trace-view"
+            id="evidence-view"
+            role="tabpanel"
+            aria-labelledby="evidence-tab"
+            data-view-panel="evidence"
+            hidden
+          >
+            <div class="evidence-content" id="evidence-content">
+              <p>Tool calls and citations will appear here.</p>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </div>
+
+    <script src="/static/app.js?v=0.6.0" defer></script>
+  </body>
+</html>

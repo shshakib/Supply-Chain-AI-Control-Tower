@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessContext, AccessDeniedError
-from supplyscope.models import ChatMessage, Conversation
+from control_tower.access import AccessContext, AccessDeniedError
+from control_tower.models import ChatMessage, Conversation
 
 
 @dataclass(frozen=True)
@@ -71,12 +71,24 @@ class ConversationService:
         if role not in {"user", "assistant"}:
             raise ValueError("role must be user or assistant")
         conversation = self.require(access, conversation_id)
+        created_at = datetime.now(UTC)
+        latest_created_at = self.session.scalar(
+            select(ChatMessage.created_at)
+            .where(ChatMessage.conversation_id == conversation_id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(1)
+        )
+        if latest_created_at is not None:
+            if latest_created_at.tzinfo is None:
+                latest_created_at = latest_created_at.replace(tzinfo=UTC)
+            if created_at <= latest_created_at:
+                created_at = latest_created_at + timedelta(microseconds=1)
         message = ChatMessage(
             conversation_id=conversation_id,
             role=role,
             content=content,
             message_metadata=metadata or {},
-            created_at=datetime.now(UTC),
+            created_at=created_at,
         )
         self.session.add(message)
         conversation.updated_at = datetime.now(UTC)

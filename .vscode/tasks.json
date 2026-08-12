@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "SupplyScope: Run Web (SQLite)",
+      "label": "Supply Chain AI Control Tower: Run External Risk MCP",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -10,9 +10,50 @@
       },
       "args": [
         "-m",
-        "supplyscope.web",
+        "control_tower.integrations.risk_mcp_server",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8010"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUNBUFFERED": "1"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Supply Chain AI Control Tower: Run Full Local Stack",
+      "dependsOn": [
+        "Supply Chain AI Control Tower: Run External Risk MCP",
+        "Supply Chain AI Control Tower: Run Web (SQLite)"
+      ],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Supply Chain AI Control Tower: Run Web (SQLite)",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+      },
+      "args": [
+        "-m",
+        "control_tower.web",
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "--host",
         "127.0.0.1",
         "--port",
@@ -24,10 +65,7 @@
           "PYTHONUNBUFFERED": "1"
         }
       },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -36,7 +74,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Seed SQLite Demo",
+      "label": "Supply Chain AI Control Tower: Seed SQLite Demo",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -44,9 +82,9 @@
       },
       "args": [
         "-m",
-        "supplyscope.cli",
+        "control_tower.cli",
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "seed"
       ],
       "options": {
@@ -60,7 +98,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Run Offline Demo",
+      "label": "Supply Chain AI Control Tower: Run Offline Demo",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -68,9 +106,9 @@
       },
       "args": [
         "-m",
-        "supplyscope.cli",
+        "control_tower.cli",
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "demo",
         "--trace"
       ],
@@ -85,7 +123,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Ask LLM (SQLite, API Key)",
+      "label": "Supply Chain AI Control Tower: Ask LLM (SQLite, API Key)",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -93,9 +131,9 @@
       },
       "args": [
         "-m",
-        "supplyscope.cli",
+        "control_tower.cli",
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "ask",
         "${input:operationsQuestion}",
         "--user",
@@ -113,7 +151,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Index Documents (SQLite, API Key)",
+      "label": "Supply Chain AI Control Tower: Index Documents (SQLite, API Key)",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -121,9 +159,9 @@
       },
       "args": [
         "-m",
-        "supplyscope.cli",
+        "control_tower.cli",
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "index-documents"
       ],
       "options": {
@@ -137,7 +175,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Run Evaluations (SQLite, API Key)",
+      "label": "Supply Chain AI Control Tower: Run Evaluations (SQLite, API Key)",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -145,9 +183,9 @@
       },
       "args": [
         "-m",
-        "supplyscope.cli",
+        "control_tower.cli",
         "--database-url",
-        "sqlite:///./supplyscope.db",
+        "sqlite:///./control_tower.db",
         "evaluate"
       ],
       "options": {
@@ -161,7 +199,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Test",
+      "label": "Supply Chain AI Control Tower: Test",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -186,7 +224,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Lint",
+      "label": "Supply Chain AI Control Tower: Lint",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -210,7 +248,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Check Formatting",
+      "label": "Supply Chain AI Control Tower: Check Formatting",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -235,7 +273,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Format Code",
+      "label": "Supply Chain AI Control Tower: Format Code",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -259,18 +297,18 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Verify",
+      "label": "Supply Chain AI Control Tower: Verify",
       "dependsOn": [
-        "SupplyScope: Test",
-        "SupplyScope: Lint",
-        "SupplyScope: Check Formatting"
+        "Supply Chain AI Control Tower: Test",
+        "Supply Chain AI Control Tower: Lint",
+        "Supply Chain AI Control Tower: Check Formatting"
       ],
       "dependsOrder": "sequence",
       "group": "test",
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Start PostgreSQL",
+      "label": "Supply Chain AI Control Tower: Start PostgreSQL",
       "type": "process",
       "command": "docker",
       "args": [
@@ -291,7 +329,28 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Seed PostgreSQL",
+      "label": "Supply Chain AI Control Tower: Start Risk MCP (Docker)",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "up",
+        "-d",
+        "--wait",
+        "risk-feed"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Supply Chain AI Control Tower: Seed PostgreSQL",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -299,7 +358,7 @@
       },
       "args": [
         "-m",
-        "supplyscope.cli",
+        "control_tower.cli",
         "seed"
       ],
       "options": {
@@ -313,16 +372,16 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Prepare PostgreSQL Demo",
+      "label": "Supply Chain AI Control Tower: Prepare PostgreSQL Demo",
       "dependsOn": [
-        "SupplyScope: Start PostgreSQL",
-        "SupplyScope: Seed PostgreSQL"
+        "Supply Chain AI Control Tower: Start PostgreSQL",
+        "Supply Chain AI Control Tower: Seed PostgreSQL"
       ],
       "dependsOrder": "sequence",
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Run Web (PostgreSQL)",
+      "label": "Supply Chain AI Control Tower: Run Web (PostgreSQL)",
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "windows": {
@@ -330,7 +389,7 @@
       },
       "args": [
         "-m",
-        "supplyscope.web"
+        "control_tower.web"
       ],
       "options": {
         "cwd": "${workspaceFolder}",
@@ -346,7 +405,7 @@
       "problemMatcher": []
     },
     {
-      "label": "SupplyScope: Stop PostgreSQL",
+      "label": "Supply Chain AI Control Tower: Stop PostgreSQL",
       "type": "process",
       "command": "docker",
       "args": [
@@ -368,21 +427,21 @@
     {
       "id": "operationsQuestion",
       "type": "promptString",
-      "description": "Question for the SupplyScope supervisor",
+      "description": "Question for the Supply Chain AI Control Tower supervisor",
       "default": "Which delayed shipments could stop production, and what contractual remedies apply?"
     },
     {
       "id": "persona",
       "type": "pickString",
       "description": "Synthetic user whose deterministic access scope should be used",
-      "default": "noah.east@supplyscope.demo",
+      "default": "noah.east@controltower.demo",
       "options": [
-        "noah.east@supplyscope.demo",
-        "mia.west@supplyscope.demo",
-        "priya.procurement@supplyscope.demo",
-        "leo.quality@supplyscope.demo",
-        "sofia.viewer@supplyscope.demo",
-        "ava.admin@supplyscope.demo"
+        "noah.east@controltower.demo",
+        "mia.west@controltower.demo",
+        "priya.procurement@controltower.demo",
+        "leo.quality@controltower.demo",
+        "sofia.viewer@controltower.demo",
+        "ava.admin@controltower.demo"
       ]
     }
   ]

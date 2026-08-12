@@ -7,9 +7,9 @@ from dataclasses import dataclass, replace
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessContext
-from supplyscope.embeddings import EmbeddingProvider
-from supplyscope.models import Document, DocumentChunk
+from control_tower.access import AccessContext
+from control_tower.embeddings import EmbeddingProvider
+from control_tower.models import Document, DocumentChunk
 
 
 @dataclass(frozen=True)

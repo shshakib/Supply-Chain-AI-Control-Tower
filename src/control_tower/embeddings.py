@@ -7,7 +7,7 @@ from openai import OpenAI
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from supplyscope.models import DocumentChunk
+from control_tower.models import DocumentChunk
 
 
 class EmbeddingProvider(Protocol):

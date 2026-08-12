@@ -3,15 +3,16 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "supplyscope"
-version = "0.2.0"
-description = "A synthetic multi-agent supply-chain intelligence portfolio project"
+name = "supply-chain-ai-control-tower"
+version = "0.5.0"
+description = "A deterministically authorized multi-agent supply-chain control tower"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.116,<1",
   "openai>=2.25,<3",
-  "openai-agents>=0.2,<1",
+  "openai-agents>=0.19.4,<1",
+  "mcp>=1.29,<2",
   "SQLAlchemy>=2.0.36,<3",
   "pgvector>=0.3.6,<1",
   "psycopg[binary]>=3.2.3,<4",
@@ -27,11 +28,12 @@ dev = [
 ]
 
 [project.scripts]
-supplyscope = "supplyscope.cli:main"
-supplyscope-web = "supplyscope.web:main"
+control-tower = "control_tower.cli:main"
+control-tower-web = "control_tower.web:main"
+control-tower-risk-mcp = "control_tower.integrations.risk_mcp_server:main"
 
 [tool.setuptools.package-data]
-supplyscope = ["static/*"]
+control_tower = ["static/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

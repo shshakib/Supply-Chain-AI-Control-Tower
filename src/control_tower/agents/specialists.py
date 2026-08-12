@@ -4,9 +4,9 @@ import uuid
 from dataclasses import asdict
 from datetime import date
 
-from supplyscope.access import AccessContext
-from supplyscope.agents.types import SpecialistFinding
-from supplyscope.tools import DocumentTools, InventoryTools, ShipmentTools
+from control_tower.access import AccessContext
+from control_tower.agents.types import SpecialistFinding
+from control_tower.tools import DocumentTools, InventoryTools, ShipmentTools
 
 
 class InventorySpecialist:

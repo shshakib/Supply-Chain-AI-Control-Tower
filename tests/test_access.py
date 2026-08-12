@@ -4,13 +4,13 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessDeniedError, AccessService
-from supplyscope.models import Role, Warehouse
+from control_tower.access import AccessDeniedError, AccessService
+from control_tower.models import Role, Warehouse
 
 
 def test_regional_persona_receives_only_assigned_warehouses(session: Session) -> None:
     access = AccessService(session).resolve(
-        "noah.east@supplyscope.demo",
+        "noah.east@controltower.demo",
         "meridian-assembly",
     )
     codes = set(
@@ -25,7 +25,7 @@ def test_regional_persona_receives_only_assigned_warehouses(session: Session) ->
 
 def test_regional_persona_cannot_request_another_regions_warehouse(session: Session) -> None:
     access = AccessService(session).resolve(
-        "mia.west@supplyscope.demo",
+        "mia.west@controltower.demo",
         "meridian-assembly",
     )
     toronto_id = session.scalar(select(Warehouse.id).where(Warehouse.code == "TOR-01"))

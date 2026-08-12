@@ -4,10 +4,10 @@ from collections.abc import Sequence
 
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessService
-from supplyscope.analytics import ScopeResolver
-from supplyscope.embeddings import EmbeddingIndexer
-from supplyscope.retrieval import HybridDocumentRetriever
+from control_tower.access import AccessService
+from control_tower.analytics import ScopeResolver
+from control_tower.embeddings import EmbeddingIndexer
+from control_tower.retrieval import HybridDocumentRetriever
 
 
 class KeywordEmbeddingProvider:
@@ -22,7 +22,7 @@ def test_hybrid_retrieval_returns_scoped_contract_citation(session: Session) -> 
     provider = KeywordEmbeddingProvider()
     indexed = EmbeddingIndexer(session, provider).index()
     access = AccessService(session).resolve(
-        "noah.east@supplyscope.demo",
+        "noah.east@controltower.demo",
         "meridian-assembly",
     )
     supplier_id = ScopeResolver(session, access).supplier_id("SUP-001")
@@ -45,7 +45,7 @@ def test_hybrid_retrieval_does_not_leak_regional_incident(session: Session) -> N
     provider = KeywordEmbeddingProvider()
     EmbeddingIndexer(session, provider).index(force=True)
     access = AccessService(session).resolve(
-        "mia.west@supplyscope.demo",
+        "mia.west@controltower.demo",
         "meridian-assembly",
     )
 

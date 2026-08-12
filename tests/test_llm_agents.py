@@ -5,11 +5,18 @@ import asyncio
 import pytest
 from sqlalchemy.orm import Session
 
-from supplyscope.access import AccessService
-from supplyscope.agent_service import AgentService, MissingOpenAIConfiguration
-from supplyscope.agents.llm import build_agent_system, list_delayed_shipments
-from supplyscope.config import get_settings
-from supplyscope.synthetic import DEMO_AS_OF
+from control_tower.access import AccessService
+from control_tower.agent_service import AgentService, MissingOpenAIConfiguration
+from control_tower.agents.llm import (
+    EvidenceItem,
+    SpecialistReport,
+    _agent_output_details,
+    _delegated_task,
+    build_agent_system,
+    list_delayed_shipments,
+)
+from control_tower.config import get_settings
+from control_tower.synthetic import DEMO_AS_OF
 
 
 def test_supervisor_exposes_four_specialists() -> None:
@@ -30,13 +37,45 @@ def test_function_tool_schema_does_not_expose_local_access_context() -> None:
     assert set(properties) == {"horizon_days", "warehouse_code"}
 
 
+def test_public_specialist_exchange_contains_task_and_structured_result() -> None:
+    task = _delegated_task(
+        {"input": "Check whether shipment SS-CRITICAL-001 threatens Toronto production."}
+    )
+    report = SpecialistReport(
+        domain="shipments",
+        summary="The shipment is nine days late.",
+        evidence=[
+            EvidenceItem(
+                reference="shipment:SS-CRITICAL-001",
+                claim="The revised arrival is nine days after the contractual date.",
+            )
+        ],
+        limitations=["The carrier has not confirmed a recovery date."],
+    )
+
+    assert task == "Check whether shipment SS-CRITICAL-001 threatens Toronto production."
+    assert _agent_output_details(report) == {
+        "domain": "shipments",
+        "summary": "The shipment is nine days late.",
+        "evidence_count": 1,
+        "evidence": [
+            {
+                "reference": "shipment:SS-CRITICAL-001",
+                "claim": "The revised arrival is nine days after the contractual date.",
+            }
+        ],
+        "limitation_count": 1,
+        "limitations": ["The carrier has not confirmed a recovery date."],
+    }
+
+
 def test_llm_service_fails_clearly_without_api_key(
     session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "")
     access = AccessService(session).resolve(
-        "noah.east@supplyscope.demo",
+        "noah.east@controltower.demo",
         "meridian-assembly",
     )
 

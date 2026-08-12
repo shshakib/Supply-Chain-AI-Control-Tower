@@ -10,7 +10,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from supplyscope.models import (
+from control_tower.models import (
     Document,
     DocumentChunk,
     InventorySnapshot,
@@ -166,37 +166,37 @@ class SyntheticDataGenerator:
         warehouses: list[Warehouse],
     ) -> None:
         personas = [
-            ("ava.admin@supplyscope.demo", "Ava Chen", Role.GLOBAL_ADMIN, True, []),
+            ("ava.admin@controltower.demo", "Ava Chen", Role.GLOBAL_ADMIN, True, []),
             (
-                "noah.east@supplyscope.demo",
+                "noah.east@controltower.demo",
                 "Noah Williams",
                 Role.REGIONAL_OPERATIONS,
                 False,
                 ["TOR-01", "CHI-01"],
             ),
             (
-                "mia.west@supplyscope.demo",
+                "mia.west@controltower.demo",
                 "Mia Garcia",
                 Role.REGIONAL_OPERATIONS,
                 False,
                 ["VAN-01", "AUS-01"],
             ),
             (
-                "priya.procurement@supplyscope.demo",
+                "priya.procurement@controltower.demo",
                 "Priya Raman",
                 Role.PROCUREMENT_ANALYST,
                 True,
                 [],
             ),
             (
-                "leo.quality@supplyscope.demo",
+                "leo.quality@controltower.demo",
                 "Leo Martin",
                 Role.QUALITY_ANALYST,
                 True,
                 [],
             ),
             (
-                "sofia.viewer@supplyscope.demo",
+                "sofia.viewer@controltower.demo",
                 "Sofia Rossi",
                 Role.VIEWER,
                 False,
