@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
@@ -16,6 +17,7 @@ TraceSink = Callable[["ExecutionEvent"], None]
 _SENSITIVE_DETAIL_KEYS = {
     "api_key",
     "authorization",
+    "email",
     "conversation_id",
     "organization_id",
     "password",
@@ -24,8 +26,49 @@ _SENSITIVE_DETAIL_KEYS = {
     "system_prompt",
     "token",
     "user_id",
+    "user_email",
     "warehouse_id",
 }
+
+_SENSITIVE_KEY_WORDS = {
+    "auth",
+    "authorization",
+    "credential",
+    "passwd",
+    "password",
+    "secret",
+    "token",
+}
+
+_SENSITIVE_TEXT_REPLACEMENTS = (
+    (
+        re.compile(
+            r"(?i)\b(?P<prefix>(?:https?|postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqps?)"
+            r"://[^:\s/@]+:)[^@\s/]+@"
+        ),
+        r"\g<prefix>[redacted]@",
+    ),
+    (re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}"), "Bearer [redacted]"),
+    (re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"), "[redacted-api-key]"),
+    (
+        re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"),
+        "[redacted-token]",
+    ),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[redacted-access-key]"),
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{30,}\b"), "[redacted-api-key]"),
+    (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "[redacted-token]"),
+    (
+        re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
+        "[redacted-token]",
+    ),
+    (
+        re.compile(
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
+            re.DOTALL,
+        ),
+        "[redacted-private-key]",
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -272,7 +315,7 @@ def _safe_details(details: Mapping[str, Any] | None) -> dict[str, object] | None
 
 
 def _safe_value(key: str, value: Any, *, depth: int) -> object:
-    if key.casefold() in _SENSITIVE_DETAIL_KEYS:
+    if _is_sensitive_key(key):
         return "[redacted]"
     if value is None or isinstance(value, bool | int | float):
         return value
@@ -281,7 +324,7 @@ def _safe_value(key: str, value: Any, *, depth: int) -> object:
     if isinstance(value, datetime | date):
         return value.isoformat()
     if isinstance(value, str):
-        return value if len(value) <= 500 else f"{value[:497]}..."
+        return _safe_text(value)
     if is_dataclass(value) and not isinstance(value, type):
         return _safe_value(key, asdict(value), depth=depth)
     if depth >= 3:
@@ -294,4 +337,30 @@ def _safe_value(key: str, value: Any, *, depth: int) -> object:
     if isinstance(value, Sequence) and not isinstance(value, bytes | bytearray):
         return [_safe_value(key, item, depth=depth + 1) for item in list(value)[:20]]
     text = str(value)
-    return text if len(text) <= 500 else f"{text[:497]}..."
+    return _safe_text(text)
+
+
+def _is_sensitive_key(key: str) -> bool:
+    snake_case = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    normalized = re.sub(r"[^a-z0-9]+", "_", snake_case.casefold()).strip("_")
+    if normalized in _SENSITIVE_DETAIL_KEYS:
+        return True
+    words = set(normalized.split("_"))
+    if words & _SENSITIVE_KEY_WORDS:
+        return True
+    return any(
+        pair <= words
+        for pair in (
+            {"api", "key"},
+            {"encryption", "key"},
+            {"private", "key"},
+            {"signing", "key"},
+        )
+    )
+
+
+def _safe_text(value: str) -> str:
+    safe_value = value
+    for pattern, replacement in _SENSITIVE_TEXT_REPLACEMENTS:
+        safe_value = pattern.sub(replacement, safe_value)
+    return safe_value if len(safe_value) <= 500 else f"{safe_value[:497]}..."

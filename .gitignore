@@ -1,13 +1,35 @@
+# Local configuration and credentials
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+
+# Python and test output
 .venv/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.py[cod]
+.coverage
+htmlcov/
+*.log
+
+# Local databases and sidecar files
 *.db
+*.db-*
+*.sqlite
+*.sqlite-*
+
+# Build output
 dist/
 build/
 *.egg-info/
+
+# Generated synthetic corpus
 synthetic_documents/*.md
 !synthetic_documents/.gitkeep
-

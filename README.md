@@ -187,9 +187,10 @@ The complete PostgreSQL stack is one command:
 docker compose up --build
 ```
 
-Compose exposes the UI on `8000`, MCP on `8010`, and PostgreSQL on `5433`. The `migrate` and
-`seed` services complete before the web service starts. Seeding is idempotent for an existing
-demo volume. In PostgreSQL, semantic ranking uses the pgvector cosine-distance operator.
+Compose exposes the UI on `8000`, MCP on `8010`, and PostgreSQL on `5433`. Published ports bind to
+`127.0.0.1` by default so the unauthenticated portfolio demo is not exposed to the local network.
+The `migrate` and `seed` services complete before the web service starts. Seeding is idempotent for
+an existing demo volume. In PostgreSQL, semantic ranking uses the pgvector cosine-distance operator.
 
 Stop the stack while retaining data with `docker compose down`. Use
 `docker compose down --volumes` only when you intentionally want a fresh synthetic database.
@@ -339,6 +340,9 @@ This is a complete portfolio implementation, not a production deployment. A prod
 should add PostgreSQL row-level security, managed secrets, rate limiting, background embedding
 jobs, durable trace storage, model-cost monitoring, stronger identity authentication, and a
 hosting-specific continuous deployment workflow.
+The checked-in PostgreSQL username and password are disposable local-demo credentials, and Compose
+binds all published ports to loopback by default. Replace the credentials and put authenticated
+services behind TLS before using the stack on a shared host.
 An internet-facing MCP deployment should additionally use OAuth or signed service credentials,
 strict origin and host policies, network timeouts, circuit breakers, and separate least-privilege
 ownership of the external feed.

@@ -4,6 +4,16 @@ __pycache__
 .pytest_cache
 .ruff_cache
 *.db
+*.db-*
+*.sqlite
+*.sqlite-*
 *.pyc
-.env
+.env*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+*.log
 synthetic_documents/*.md

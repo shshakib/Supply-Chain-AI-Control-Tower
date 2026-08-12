@@ -47,3 +47,27 @@ def test_execution_trace_closes_active_operations_on_failure() -> None:
     assert trace.is_active("request") is False
     assert trace.is_active("supervisor") is False
     assert [event.status for event in trace.events[-2:]] == ["failed", "failed"]
+
+
+def test_execution_trace_redacts_key_variants_and_secrets_inside_text() -> None:
+    trace = ExecutionTrace(run_id="run-redaction")
+    api_key = "sk-" + ("x" * 24)
+
+    trace.info(
+        event_type="diagnostic",
+        node="request",
+        label="Sanitized diagnostic",
+        details={
+            "clientSecret": "test-value",
+            "nested": {"refresh-token": "test-value"},
+            "message": f"Upstream returned Bearer {'a' * 20} and {api_key}",
+            "connection": "postgresql://demo:local-password@localhost:5432/demo",
+        },
+    )
+
+    assert trace.events[0].details == {
+        "clientSecret": "[redacted]",
+        "nested": {"refresh-token": "[redacted]"},
+        "message": "Upstream returned Bearer [redacted] and [redacted-api-key]",
+        "connection": "postgresql://demo:[redacted]@localhost:5432/demo",
+    }
