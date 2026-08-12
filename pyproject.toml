@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "supply-chain-ai-control-tower"
-version = "0.5.0"
+version = "0.6.0"
 description = "A deterministically authorized multi-agent supply-chain control tower"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "alembic>=1.14,<2",
   "fastapi>=0.116,<1",
   "openai>=2.25,<3",
   "openai-agents>=0.19.4,<1",
@@ -33,14 +34,17 @@ control-tower-web = "control_tower.web:main"
 control-tower-risk-mcp = "control_tower.integrations.risk_mcp_server:main"
 
 [tool.setuptools.package-data]
-control_tower = ["static/*"]
+control_tower = ["static/*", "migrations/*.mako"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --basetemp=.pytest_cache/tmp"
+markers = [
+  "integration: tests that require live PostgreSQL or MCP services",
+]
 
 [tool.ruff]
 line-length = 100

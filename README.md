@@ -1,5 +1,7 @@
 # Supply Chain AI Control Tower
 
+[![CI](https://github.com/shshakib/Supply-Chain-AI-Control-Tower/actions/workflows/ci.yml/badge.svg)](https://github.com/shshakib/Supply-Chain-AI-Control-Tower/actions/workflows/ci.yml)
+
 Supply Chain AI Control Tower is an original, synthetic supply-chain intelligence application
 for a technical portfolio. It combines a manager-style multi-agent workflow, deterministic
 authorization, typed database tools, PostgreSQL/pgvector retrieval, persistent conversations,
@@ -32,6 +34,7 @@ not receive tenant IDs or database credentials.
 - Deterministic organization, warehouse, supplier, and conversation authorization
 - Typed SQLAlchemy tools instead of unrestricted model-generated SQL
 - PostgreSQL schema with a native `VECTOR(384)` document embedding column
+- Alembic schema migrations shared by SQLite and PostgreSQL
 - OpenAI embedding indexing with configurable model and dimensions
 - Scoped hybrid retrieval using vector similarity and keyword ranking
 - Standalone Streamable HTTP MCP server with five structured, read-only risk tools
@@ -42,33 +45,36 @@ not receive tenant IDs or database credentials.
 - Persistent conversations and message history
 - FastAPI chat, persona, conversation, health, and deterministic-demo endpoints
 - Responsive operations console with specialist activity and citations
+- Full Docker Compose stack and three-gate GitHub Actions CI pipeline
 - Seven golden LLM evaluation cases, including an MCP evidence case
 - Deterministic local demo that remains available without an API key
 
 ## Quick Start
 
-Clone the repository and create a Python 3.11 virtual environment:
+The shortest path to the production-style stack requires Docker Desktop:
 
 ```powershell
 git clone https://github.com/shshakib/Supply-Chain-AI-Control-Tower.git
 cd Supply-Chain-AI-Control-Tower
+docker compose up --build
+```
+
+This starts PostgreSQL/pgvector, applies Alembic migrations, seeds the database if it is empty,
+starts the external-risk MCP service, and starts the web application. Open
+`http://127.0.0.1:8000`. The offline scenario works without an API key.
+
+For the lightweight SQLite development path:
+
+```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 control-tower --database-url "sqlite:///./control_tower.db" seed
+control-tower-risk-mcp                  # terminal 1
+control-tower-web --database-url "sqlite:///./control_tower.db"  # terminal 2
 ```
 
-Then start the two application processes in separate terminals:
-
-```powershell
-# Terminal 1: synthetic external intelligence service
-control-tower-risk-mcp
-
-# Terminal 2: Control Tower API and UI
-control-tower-web --database-url "sqlite:///./control_tower.db"
-```
-
-Open `http://127.0.0.1:8000`. **Run offline scenario** uses the deterministic local workflow and
+**Run offline scenario** uses the deterministic local workflow and
 works without an API key. Its Live Map shows access resolution, routing, specialist work, data
 sources, synthesis, and the final answer as they execute. LLM chat requires `OPENAI_API_KEY`; it
 uses the same trace and calls the MCP service when an external signal is relevant.
@@ -175,19 +181,34 @@ control-tower --database-url "sqlite:///./control_tower.db" ask `
 
 ## PostgreSQL And pgvector
 
-With Docker Desktop running:
+The complete PostgreSQL stack is one command:
 
 ```powershell
-docker compose up -d db risk-feed
-control-tower init-db
-control-tower seed
-control-tower index-documents
-control-tower-web
+docker compose up --build
 ```
 
-Compose exposes PostgreSQL on local port `5433` and the MCP service on `8010`. `init-db` enables
-pgvector and creates the schema. In PostgreSQL, semantic ranking uses the pgvector
-cosine-distance operator.
+Compose exposes the UI on `8000`, MCP on `8010`, and PostgreSQL on `5433`. The `migrate` and
+`seed` services complete before the web service starts. Seeding is idempotent for an existing
+demo volume. In PostgreSQL, semantic ranking uses the pgvector cosine-distance operator.
+
+Stop the stack while retaining data with `docker compose down`. Use
+`docker compose down --volumes` only when you intentionally want a fresh synthetic database.
+
+## Database Migrations
+
+Alembic owns the persistent database schema. Apply all pending revisions with:
+
+```powershell
+control-tower migrate
+```
+
+`init-db` remains as a backwards-compatible alias. When a model changes, generate a revision with
+`alembic revision --autogenerate -m "describe the schema change"`, review the generated SQL, and
+apply it with `control-tower migrate`. Seeding inserts demo rows; it does not define tables.
+
+Databases created before migration support was introduced have no Alembic revision marker. Because
+the included data is synthetic, reset those once with `docker compose down --volumes` or delete the
+old local SQLite `.db` file, then seed again.
 
 ## Synthetic Dataset
 
@@ -264,6 +285,20 @@ python -m ruff check src tests
 python -m ruff format --check src tests
 ```
 
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every pull request and push to `main` without an OpenAI key:
+
+1. **Python quality:** Ruff, formatting, unit tests, and a SQLite lifecycle smoke test.
+2. **Live integrations:** Alembic and synthetic seeding against PostgreSQL/pgvector, plus a real
+   Streamable HTTP connection to the MCP server.
+3. **Container stack:** Builds the image, starts the complete Compose topology, verifies both
+   health endpoints, and removes the test volume.
+
+The workflow builds but does not publish an image. An image registry and deployment workflow can
+be added later when a hosting platform is selected. After the first successful push, repository
+branch protection can require the three CI jobs before changes are merged into `main`.
+
 ## Project Layout
 
 ```text
@@ -281,8 +316,10 @@ src/control_tower/
     risk_feed.py        deterministic synthetic external-risk dataset
     risk_mcp_server.py  standalone Streamable HTTP MCP server
     risk_mcp_client.py  Agents SDK connection, filtering, and fallback
+  migrations/           Alembic environment and versioned schema revisions
   retrieval.py          scoped hybrid retrieval
   models.py             relational, vector, and conversation schema
+  schema.py             programmatic migration commands
   observability.py      typed, redacted execution events and timing
   synthetic.py          correlated synthetic-data generator
   tools.py              core typed database tools
@@ -290,15 +327,18 @@ src/control_tower/
   static/               responsive operations console
 evals/cases.json         golden LLM evaluation cases
 tests/                   authorization, tools, RAG, MCP, agents, API, and UI backend tests
+.github/workflows/ci.yml pull-request and main-branch CI pipeline
+compose.yaml             complete PostgreSQL, migration, seed, MCP, and web stack
+Dockerfile               shared web and MCP application image
 .vscode/                 repeatable run, test, Docker, and debugger workflows
 ```
 
 ## Production Hardening
 
 This is a complete portfolio implementation, not a production deployment. A production version
-should add Alembic migrations, PostgreSQL row-level security, managed secrets, rate limiting,
-background embedding jobs, durable trace storage, model-cost monitoring, stronger identity
-authentication, and CI/CD.
+should add PostgreSQL row-level security, managed secrets, rate limiting, background embedding
+jobs, durable trace storage, model-cost monitoring, stronger identity authentication, and a
+hosting-specific continuous deployment workflow.
 An internet-facing MCP deployment should additionally use OAuth or signed service credentials,
 strict origin and host policies, network timeouts, circuit breakers, and separate least-privilege
 ownership of the external feed.

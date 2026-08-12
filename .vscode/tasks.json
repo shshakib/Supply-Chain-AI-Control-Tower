@@ -85,7 +85,8 @@
         "control_tower.cli",
         "--database-url",
         "sqlite:///./control_tower.db",
-        "seed"
+        "seed",
+        "--if-empty"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -359,7 +360,8 @@
       "args": [
         "-m",
         "control_tower.cli",
-        "seed"
+        "seed",
+        "--if-empty"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

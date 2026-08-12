@@ -19,10 +19,11 @@ from control_tower.agents.specialists import (
 )
 from control_tower.agents.supervisor import SupplyRiskSupervisor
 from control_tower.config import get_settings
-from control_tower.database import create_database_engine, create_schema, session_scope
+from control_tower.database import create_database_engine, session_scope
 from control_tower.embeddings import EmbeddingIndexer, OpenAIEmbeddingProvider
 from control_tower.evaluation import DEFAULT_CASES_PATH, run_evaluations
 from control_tower.models import Membership, Organization, User
+from control_tower.schema import upgrade_database
 from control_tower.synthetic import DEMO_AS_OF, SyntheticDataGenerator
 from control_tower.tools import DocumentTools, InventoryTools, ShipmentTools
 
@@ -57,11 +58,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("init-db", help="Create the PostgreSQL extension and schema.")
+    subparsers.add_parser("migrate", help="Upgrade the database schema to the latest revision.")
+    subparsers.add_parser("init-db", help="Alias for migrate, retained for local scripts.")
 
     seed_parser = subparsers.add_parser("seed", help="Generate deterministic demo data.")
     seed_parser.add_argument("--seed", type=int, default=42)
     seed_parser.add_argument("--as-of", type=date.fromisoformat, default=DEMO_AS_OF)
+    seed_parser.add_argument(
+        "--if-empty",
+        action="store_true",
+        help="Exit successfully when the synthetic organization is already present.",
+    )
 
     subparsers.add_parser("personas", help="List available synthetic users.")
 
@@ -97,16 +104,23 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     settings = get_settings()
-    engine = create_database_engine(args.database_url or settings.database_url)
+    database_url = args.database_url or settings.database_url
+    engine = create_database_engine(database_url)
 
-    if args.command == "init-db":
-        create_schema(engine)
-        print("Supply Chain AI Control Tower database schema is ready.")
+    if args.command in {"migrate", "init-db"}:
+        upgrade_database(database_url)
+        print("Supply Chain AI Control Tower database is at the latest migration.")
         return
 
     if args.command == "seed":
-        create_schema(engine)
+        upgrade_database(database_url)
         with session_scope(engine) as session:
+            existing = session.scalar(
+                select(Organization.id).where(Organization.slug == "meridian-assembly")
+            )
+            if existing is not None and args.if_empty:
+                print("Synthetic data already exists; seed skipped.")
+                return
             summary = SyntheticDataGenerator(
                 session,
                 seed=args.seed,
@@ -119,7 +133,7 @@ def main() -> None:
     if args.command == "index-documents":
         if not settings.openai_configured:
             raise SystemExit("OPENAI_API_KEY is required to index documents.")
-        create_schema(engine)
+        upgrade_database(database_url)
         with session_scope(engine) as session:
             provider = OpenAIEmbeddingProvider(
                 model=settings.embedding_model,

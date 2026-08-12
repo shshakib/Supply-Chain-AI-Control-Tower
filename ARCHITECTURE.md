@@ -63,7 +63,9 @@ flowchart TB
         POSTGRES["PostgreSQL<br/>Operational tables"]:::data
         PGVECTOR["pgvector<br/>VECTOR(384) document chunks"]:::data
         SQLITE["SQLite fallback<br/>Local demo and tests"]:::data
-        DATA_FILES["Files<br/>src/control_tower/models.py<br/>src/control_tower/database.py<br/>compose.yaml"]:::files
+        MIGRATIONS["Alembic migrations<br/>Versioned schema lifecycle"]:::service
+        DATA_FILES["Files<br/>src/control_tower/models.py<br/>src/control_tower/database.py<br/>src/control_tower/schema.py<br/>src/control_tower/migrations/*<br/>compose.yaml"]:::files
+        MIGRATIONS --> ORM
         ORM --> POSTGRES
         ORM --> PGVECTOR
         ORM --> SQLITE
@@ -101,8 +103,10 @@ flowchart TB
         OFFLINE["Deterministic local<br/>demonstration workflow"]:::support
         EVALUATIONS["Golden multi-agent<br/>evaluation cases"]:::support
         TESTS["Automated tests"]:::support
+        CI["GitHub Actions CI<br/>Quality, integrations,<br/>and Compose smoke test"]:::support
         SUPPORT_FILES["Files<br/>src/control_tower/synthetic.py<br/>src/control_tower/agents/supervisor.py<br/>src/control_tower/agents/specialists.py<br/>src/control_tower/agents/types.py<br/>src/control_tower/evaluation.py<br/>evals/cases.json<br/>tests/*"]:::files
         DEV_WORKFLOW["VS Code tasks and debugging<br/>.vscode/tasks.json<br/>.vscode/launch.json<br/>.vscode/settings.json<br/>.vscode/extensions.json"]:::files
+        CI_FILES["Pipeline files<br/>.github/workflows/ci.yml<br/>Dockerfile<br/>compose.yaml"]:::files
     end
 
     USER --> WEB
@@ -153,6 +157,8 @@ flowchart TB
     TESTS -. "verifies" .-> SUPERVISOR
     TESTS -. "verifies" .-> ORM
     TESTS -. "verifies protocol boundary" .-> MCP_SERVER
+    CI -. "migrate and smoke test" .-> POSTGRES
+    CI -. "connect and verify" .-> MCP_SERVER
 
     classDef files fill:#ffffff,stroke:#8a9099,stroke-width:1px,stroke-dasharray:4 3,color:#343a40;
     classDef trusted fill:#fff4cc,stroke:#9a6700,stroke-width:2px,color:#3f2d00;

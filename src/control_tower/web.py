@@ -28,7 +28,7 @@ from control_tower.agents.specialists import (
 from control_tower.agents.supervisor import SupplyRiskSupervisor
 from control_tower.config import Settings, get_settings
 from control_tower.conversations import ConversationService
-from control_tower.database import create_database_engine, create_schema, session_scope
+from control_tower.database import create_database_engine, session_scope
 from control_tower.models import DocumentChunk, Membership, Organization, User
 from control_tower.observability import ExecutionEvent, ExecutionTrace
 from control_tower.synthetic import DEMO_AS_OF
@@ -146,7 +146,6 @@ def create_app(
 ) -> FastAPI:
     app_settings = settings or get_settings()
     app_engine = engine or create_database_engine(app_settings.database_url)
-    create_schema(app_engine)
     manage_agent_service = agent_service is None
     app_agent_service = agent_service or AgentService(app_settings)
 
@@ -162,7 +161,7 @@ def create_app(
 
     app = FastAPI(
         title="Supply Chain AI Control Tower",
-        version="0.5.0",
+        version="0.6.0",
         lifespan=lifespan,
     )
     app.state.settings = app_settings
