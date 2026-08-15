@@ -601,7 +601,7 @@ def build_agent_system(
         mcp_servers=risk_servers,
         mcp_config=mcp_config,
         hooks=trace_hooks,
-        model=settings.specialist_model,
+        model=settings.shipment_model,
         model_settings=specialist_settings,
         output_type=SpecialistReport,
     )
@@ -615,7 +615,7 @@ def build_agent_system(
         ),
         tools=[list_low_stock, get_inventory_history],
         hooks=trace_hooks,
-        model=settings.specialist_model,
+        model=settings.inventory_model,
         model_settings=specialist_settings,
         output_type=SpecialistReport,
     )
@@ -633,7 +633,7 @@ def build_agent_system(
         mcp_servers=risk_servers,
         mcp_config=mcp_config,
         hooks=trace_hooks,
-        model=settings.specialist_model,
+        model=settings.supplier_risk_model,
         model_settings=specialist_settings,
         output_type=SpecialistReport,
     )
@@ -653,7 +653,7 @@ def build_agent_system(
         mcp_servers=risk_servers,
         mcp_config=mcp_config,
         hooks=trace_hooks,
-        model=settings.specialist_model,
+        model=settings.contracts_model,
         model_settings=specialist_settings,
         output_type=SpecialistReport,
     )

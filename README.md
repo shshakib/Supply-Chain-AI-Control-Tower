@@ -49,6 +49,7 @@ not receive tenant IDs or database credentials.
 ## Implemented Capabilities
 
 - OpenAI Agents SDK supervisor with four specialist agents
+- Server-controlled per-agent model assignments with a shared specialist fallback
 - Pydantic structured outputs for specialist reports and final answers
 - Deterministic organization, warehouse, supplier, and conversation authorization
 - Typed SQLAlchemy tools instead of unrestricted model-generated SQL
@@ -175,14 +176,32 @@ Create `.env` from `.env.example` and set:
 OPENAI_API_KEY=your_api_key
 CONTROL_TOWER_SUPERVISOR_MODEL=gpt-5.6-terra
 CONTROL_TOWER_SPECIALIST_MODEL=gpt-5.6-luna
+CONTROL_TOWER_SHIPMENT_MODEL=gpt-5.6-luna
+CONTROL_TOWER_INVENTORY_MODEL=gpt-5.6-luna
+CONTROL_TOWER_SUPPLIER_RISK_MODEL=gpt-5.6-luna
+CONTROL_TOWER_CONTRACTS_MODEL=gpt-5.6-terra
 CONTROL_TOWER_EMBEDDING_MODEL=text-embedding-3-small
 CONTROL_TOWER_EMBEDDING_DIMENSIONS=384
 CONTROL_TOWER_RISK_MCP_ENABLED=true
 CONTROL_TOWER_RISK_MCP_URL=http://127.0.0.1:8010/mcp
 ```
 
-Model names are configuration, so they can be changed to models available to the API project.
+Model names are server configuration, so they can be changed to models available to the API
+project. The four per-agent variables are optional and fall back to
+`CONTROL_TOWER_SPECIALIST_MODEL` when blank or omitted. The example profile reserves the stronger
+orchestration model for the supervisor and contracts/compliance while using the lower-cost model
+for high-volume operational analysis. The effective assignment appears beneath each agent in the
+execution map and in `/api/health`; it cannot be changed by a browser request. See the official
+[OpenAI model guide](https://developers.openai.com/api/docs/models) for current model tradeoffs.
 Do not place an API key in the browser or commit `.env`.
+
+| Agent | Server setting | Example profile |
+|---|---|---|
+| Supervisor | `CONTROL_TOWER_SUPERVISOR_MODEL` | `gpt-5.6-terra` |
+| Shipment specialist | `CONTROL_TOWER_SHIPMENT_MODEL` | `gpt-5.6-luna` |
+| Inventory specialist | `CONTROL_TOWER_INVENTORY_MODEL` | `gpt-5.6-luna` |
+| Supplier-risk specialist | `CONTROL_TOWER_SUPPLIER_RISK_MODEL` | `gpt-5.6-luna` |
+| Contracts and compliance specialist | `CONTROL_TOWER_CONTRACTS_MODEL` | `gpt-5.6-terra` |
 
 Index the synthetic documents:
 

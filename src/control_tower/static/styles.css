@@ -688,7 +688,7 @@ textarea:focus {
 .trace-node.compact {
   grid-template-columns: 8px minmax(0, 1fr);
   grid-template-rows: auto auto;
-  min-height: 42px;
+  min-height: 50px;
   padding: 5px 8px;
   column-gap: 7px;
 }
@@ -700,6 +700,13 @@ textarea:focus {
 .trace-node.compact .node-meta {
   grid-column: 2;
   text-align: left;
+}
+
+.node-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .node-indicator {
@@ -715,6 +722,16 @@ textarea:focus {
   overflow: hidden;
   font-size: 11px;
   font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-model {
+  overflow: hidden;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

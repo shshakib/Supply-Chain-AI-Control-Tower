@@ -53,6 +53,7 @@ const state = {
   traceEvents: [],
   activeOperations: new Map(),
   selectedTraceEvent: null,
+  agentModels: {},
 };
 
 const elements = {
@@ -411,7 +412,13 @@ function selectTraceEvent(event, reveal = false) {
     ? `${TRACE_NODE_LABELS[event.node]} exchange`
     : event.label;
   const source = event.source ? sourceLabel(event.source) : "Application";
-  elements.exchangeMeta.textContent = `${TRACE_NODE_LABELS[event.node] || event.node} | ${source} | ${formatTime(event.occurred_at)}`;
+  const model = state.agentModels[event.node];
+  elements.exchangeMeta.textContent = [
+    TRACE_NODE_LABELS[event.node] || event.node,
+    source,
+    model,
+    formatTime(event.occurred_at),
+  ].filter(Boolean).join(" | ");
   elements.exchangeDetails.replaceChildren();
 
   const startedEvent = state.traceEvents.find((item) =>
@@ -906,6 +913,23 @@ function updateMcpStatus(status = {}) {
   }
 }
 
+function updateAgentModels(health) {
+  const sharedSpecialistModel = health.specialist_model;
+  const models = health.agent_models || {
+    supervisor: health.supervisor_model,
+    shipments: sharedSpecialistModel,
+    inventory: sharedSpecialistModel,
+    supplier_risk: sharedSpecialistModel,
+    contracts_compliance: sharedSpecialistModel,
+  };
+  state.agentModels = models;
+  for (const element of document.querySelectorAll("[data-agent-model]")) {
+    const model = models[element.dataset.agentModel];
+    element.textContent = model || "Unavailable";
+    element.title = model ? `Configured model: ${model}` : "Model unavailable";
+  }
+}
+
 function updateServiceStatus(health) {
   setServiceState(
     elements.databaseService,
@@ -924,6 +948,7 @@ function updateServiceStatus(health) {
     retrievalReady ? `${indexed}/${total} indexed` : "Keyword fallback",
   );
   updateMcpStatus(health.external_risk_mcp);
+  updateAgentModels(health);
 }
 
 function setBusy(busy) {

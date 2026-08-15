@@ -52,8 +52,9 @@ class FakeAgentService:
 
 
 def test_web_chat_persists_scoped_conversation(engine: Engine) -> None:
+    settings = get_settings()
     app = create_app(
-        settings=get_settings(),
+        settings=settings,
         engine=engine,
         agent_service=FakeAgentService(),
     )
@@ -65,8 +66,12 @@ def test_web_chat_persists_scoped_conversation(engine: Engine) -> None:
         assert "Suggested inquiries" in index.text
         assert 'id="theme-toggle"' in index.text
         assert 'data-flow="specialists"' in index.text
+        assert 'data-agent-model="supervisor"' in index.text
         assert len(client.get("/api/personas").json()) == 6
-        assert client.get("/api/health").json()["external_risk_mcp"]["state"] == "connected"
+        health = client.get("/api/health").json()
+        assert health["external_risk_mcp"]["state"] == "connected"
+        assert health["agent_models"] == settings.agent_models
+        assert health["embedding_model"] == settings.embedding_model
 
         response = client.post(
             "/api/chat",

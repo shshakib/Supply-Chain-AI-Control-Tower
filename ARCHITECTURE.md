@@ -10,8 +10,8 @@ tools, semantic retrieval, and allowlisted MCP tools.
 flowchart TB
     USER["Operations user"] --> UI["Web console or CLI"]
     UI --> ACCESS["Deterministic access control"]
-    ACCESS --> SUPERVISOR["Supervisor agent"]
-    SUPERVISOR --> SPECIALISTS["Specialist agents<br/>Shipments, inventory,<br/>supplier risk, contracts"]
+    ACCESS --> SUPERVISOR["Supervisor agent<br/>Configured orchestration model"]
+    SUPERVISOR --> SPECIALISTS["Specialist agents<br/>Shipments, inventory,<br/>supplier risk, contracts<br/>Per-agent model assignments"]
 
     SPECIALISTS --> DB["PostgreSQL<br/>Typed operational tools"]
     SPECIALISTS --> RAG["pgvector<br/>Semantic search and RAG"]
@@ -57,7 +57,7 @@ flowchart TB
     subgraph ORCHESTRATION["3. Multi-agent orchestration"]
         direction TB
         RUNNER["OpenAI Agents SDK runner<br/>Structured Pydantic outputs"]:::agent
-        SUPERVISOR["Supervisor agent<br/>Can call specialists only<br/>No direct database access"]:::agent
+        SUPERVISOR["Supervisor agent<br/>Can call specialists only<br/>Independent model assignment<br/>No direct database access"]:::agent
 
         subgraph SPECIALISTS["Specialists exposed to the supervisor as tools"]
             direction LR
@@ -120,7 +120,7 @@ flowchart TB
 
     subgraph EXTERNAL["8. External AI services"]
         direction LR
-        RESPONSES["OpenAI Responses API<br/>Supervisor and specialist models"]:::external
+        RESPONSES["OpenAI Responses API<br/>Server-controlled per-agent models"]:::external
         EMBEDDING_API["OpenAI Embeddings API<br/>Document and query vectors"]:::external
         EXTERNAL_FILES["Configuration<br/>.env.example<br/>pyproject.toml"]:::files
     end
@@ -203,22 +203,24 @@ flowchart TB
 1. The web API or CLI identifies the caller and asks `AccessService` for a trusted scope.
 2. `AgentService` creates `AgentRuntime`; organization and warehouse IDs never become model
    arguments.
-3. The supervisor chooses one or more specialists. It has no SQL or retrieval tools itself.
-4. Each specialist calls only its typed domain tools and its allowlisted MCP tools. Inventory has
+3. Server settings assign an effective model to the supervisor and every specialist. The browser
+   can observe those assignments but cannot change them.
+4. The supervisor chooses one or more specialists. It has no SQL or retrieval tools itself.
+5. Each specialist calls only its typed domain tools and its allowlisted MCP tools. Inventory has
    no MCP access, and the supervisor has no direct data tools.
-5. Local tools apply the trusted scope while constructing SQLAlchemy queries or ranking document
+6. Local tools apply the trusted scope while constructing SQLAlchemy queries or ranking document
    chunks.
-6. Shipment, supplier-risk, and compliance specialists may send public codes or locations learned
+7. Shipment, supplier-risk, and compliance specialists may send public codes or locations learned
    from authorized records to the external MCP feed. Tenant IDs and warehouse scope are never MCP
    tool arguments.
-7. The MCP server deterministically filters its separate synthetic feed and returns structured
+8. The MCP server deterministically filters its separate synthetic feed and returns structured
    `external-risk:` evidence. If startup fails, the agent system is rebuilt without MCP and local
    analysis remains available.
-8. Specialists return structured findings and evidence to the supervisor LLM, which composes the
+9. Specialists return structured findings and evidence to the supervisor LLM, which composes the
    final operational answer.
-9. Conversation history is persisted under the owning user, and source-aware tool events provide
+10. Conversation history is persisted under the owning user, and source-aware tool events provide
    a visible PostgreSQL, pgvector, and MCP execution trace.
-10. The API publishes redacted lifecycle events over SSE; the UI maps them to live node states,
+11. The API publishes redacted lifecycle events over SSE; the UI maps them to live node states,
     an ordered timeline, durable evidence, and a selected-exchange inspector.
 
 Solid arrows represent calls or data flow. Dotted arrows represent trusted policy injection or

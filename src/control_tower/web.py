@@ -214,6 +214,8 @@ def create_app(
             "indexed_chunks": indexed_chunks,
             "supervisor_model": app_settings.supervisor_model,
             "specialist_model": app_settings.specialist_model,
+            "agent_models": app_settings.agent_models,
+            "embedding_model": app_settings.embedding_model,
             "external_risk_mcp": risk_mcp_status,
         }
 

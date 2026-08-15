@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from agents import Agent
 from sqlalchemy.orm import Session
 
 from control_tower.access import AccessService
@@ -28,6 +29,36 @@ def test_supervisor_exposes_four_specialists() -> None:
         "ask_supplier_risk_specialist",
         "ask_contracts_compliance_specialist",
     ]
+
+
+def test_agents_use_their_configured_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    configured = {
+        "CONTROL_TOWER_SUPERVISOR_MODEL": "supervisor-model",
+        "CONTROL_TOWER_SHIPMENT_MODEL": "shipment-model",
+        "CONTROL_TOWER_INVENTORY_MODEL": "inventory-model",
+        "CONTROL_TOWER_SUPPLIER_RISK_MODEL": "supplier-risk-model",
+        "CONTROL_TOWER_CONTRACTS_MODEL": "contracts-model",
+    }
+    for variable, model in configured.items():
+        monkeypatch.setenv(variable, model)
+
+    captured: dict[str, str] = {}
+    original_as_tool = Agent.as_tool
+
+    def capture_model(agent, *args, **kwargs):
+        captured[agent.name] = agent.model
+        return original_as_tool(agent, *args, **kwargs)
+
+    monkeypatch.setattr(Agent, "as_tool", capture_model)
+    supervisor = build_agent_system(get_settings())
+
+    assert supervisor.model == "supervisor-model"
+    assert captured == {
+        "Shipment specialist": "shipment-model",
+        "Inventory specialist": "inventory-model",
+        "Supplier risk specialist": "supplier-risk-model",
+        "Contracts and compliance specialist": "contracts-model",
+    }
 
 
 def test_function_tool_schema_does_not_expose_local_access_context() -> None:
