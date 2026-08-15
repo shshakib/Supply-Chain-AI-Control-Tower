@@ -1,9 +1,37 @@
 # Supply Chain AI Control Tower Architecture
 
-This diagram shows the runtime request flow and the source files owned by each architectural
-segment. The central design rule is that model-driven routing stops at typed local tools or
-allowlisted, read-only MCP tools; authorization and SQL construction remain deterministic
-application code.
+## Architecture At A Glance
+
+Start here for the interview-level view. Deterministic application code controls access and data
+retrieval; the model chooses specialists and synthesizes only the evidence returned by typed local
+tools, semantic retrieval, and allowlisted MCP tools.
+
+```mermaid
+flowchart TB
+    USER["Operations user"] --> UI["Web console or CLI"]
+    UI --> ACCESS["Deterministic access control"]
+    ACCESS --> SUPERVISOR["Supervisor agent"]
+    SUPERVISOR --> SPECIALISTS["Specialist agents<br/>Shipments, inventory,<br/>supplier risk, contracts"]
+
+    SPECIALISTS --> DB["PostgreSQL<br/>Typed operational tools"]
+    SPECIALISTS --> RAG["pgvector<br/>Semantic search and RAG"]
+    SPECIALISTS --> MCP["External risk MCP<br/>Read-only disruption tools"]
+
+    DB --> SYNTHESIS["LLM evidence synthesis"]
+    RAG --> SYNTHESIS
+    MCP --> SYNTHESIS
+    SYNTHESIS --> ANSWER["Cited operational answer"]
+
+    SUPERVISOR -. "execution events" .-> TRACE["Live observability<br/>Map, timeline, evidence"]
+    SPECIALISTS -. "tool events" .-> TRACE
+```
+
+## Detailed Implementation Map
+
+The map below expands the runtime flow into its trust boundaries, services, infrastructure, and
+source-file ownership. The central design rule remains the same: model-driven routing stops at
+typed local tools or allowlisted, read-only MCP tools; authorization and SQL construction remain
+deterministic application code.
 
 ```mermaid
 flowchart TB

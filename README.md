@@ -12,10 +12,29 @@ tools, and interface were designed independently for this project.
 
 ## Architecture
 
-[View the complete file-mapped architecture diagram](ARCHITECTURE.md). It shows the request
-flow, deterministic authorization boundary, supervisor and specialist relationships, typed
-domain tools, PostgreSQL/pgvector storage, external model calls, and the source files owned by
-each segment, including the MCP client and server boundary.
+```mermaid
+flowchart TB
+    USER["Operations user"] --> UI["Web console or CLI"]
+    UI --> ACCESS["Deterministic access control"]
+    ACCESS --> SUPERVISOR["Supervisor agent"]
+    SUPERVISOR --> SPECIALISTS["Specialist agents<br/>Shipments, inventory,<br/>supplier risk, contracts"]
+
+    SPECIALISTS --> DB["PostgreSQL<br/>Typed operational tools"]
+    SPECIALISTS --> RAG["pgvector<br/>Semantic search and RAG"]
+    SPECIALISTS --> MCP["External risk MCP<br/>Read-only disruption tools"]
+
+    DB --> SYNTHESIS["LLM evidence synthesis"]
+    RAG --> SYNTHESIS
+    MCP --> SYNTHESIS
+    SYNTHESIS --> ANSWER["Cited operational answer"]
+
+    SUPERVISOR -. "execution events" .-> TRACE["Live observability<br/>Map, timeline, evidence"]
+    SPECIALISTS -. "tool events" .-> TRACE
+```
+
+This is the interview-level view. [Open the detailed implementation map](ARCHITECTURE.md) for
+the complete request flow, trust boundaries, service relationships, and files owned by each
+architectural segment.
 
 The supervisor calls specialists as tools using the OpenAI Agents SDK. Specialists can call
 only their own typed tools. A local `AgentRuntime` carries the authenticated access context,
