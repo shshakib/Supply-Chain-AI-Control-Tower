@@ -111,8 +111,8 @@ jobs:
 
       - name: Verify web and MCP health
         run: |
-          curl --fail --retry 60 --retry-delay 2 --retry-connrefused http://127.0.0.1:8000/api/health
-          curl --fail --retry 20 --retry-delay 1 --retry-connrefused http://127.0.0.1:8010/health
+          curl --fail --retry 60 --retry-delay 2 --retry-all-errors http://127.0.0.1:8000/api/health
+          curl --fail --retry 20 --retry-delay 1 --retry-all-errors http://127.0.0.1:8010/health
 
       - name: Show service logs
         if: always()

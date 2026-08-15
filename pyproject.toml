@@ -41,7 +41,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --basetemp=.pytest_cache/tmp"
+addopts = "-q --basetemp=.pytest_tmp"
 markers = [
   "integration: tests that require live PostgreSQL or MCP services",
 ]

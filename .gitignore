@@ -13,6 +13,7 @@ service-account*.json
 .venv/
 __pycache__/
 .pytest_cache/
+.pytest_tmp/
 .ruff_cache/
 *.py[cod]
 .coverage
