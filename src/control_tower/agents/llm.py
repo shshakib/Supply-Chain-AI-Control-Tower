@@ -13,6 +13,9 @@ from control_tower.config import Settings
 from control_tower.integrations.risk_mcp_client import ALL_RISK_MCP_TOOLS
 from control_tower.tools import InventoryTools, ShipmentTools
 
+SUPERVISOR_MAX_TURNS = 14
+SPECIALIST_MAX_TURNS = 6
+
 
 class EvidenceItem(BaseModel):
     reference: str = Field(description="Stable record or document citation identifier.")
@@ -351,7 +354,7 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
             label=f"{AGENT_LABELS[node]} completed",
             details=_agent_output_details(output),
         )
-        if node not in {"supervisor", "synthesis"}:
+        if node != "supervisor":
             runtime.trace.mark_specialist_completed(node)
 
     async def on_llm_start(
@@ -367,37 +370,52 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
             or runtime.trace is None
             or AGENT_NODES.get(agent.name) != "supervisor"
             or not runtime.trace.completed_specialists
-            or runtime.trace.was_started("synthesis")
         ):
             return
         runtime.trace.start(
-            event_type="synthesis",
-            node="synthesis",
-            label="Composing final operational answer",
+            event_type="review",
+            node="review",
+            label="Reviewing specialist evidence",
             parent_node="supervisor",
             source="openai",
-            details={"specialists": sorted(runtime.trace.completed_specialists)},
-            operation_key="supervisor:synthesis",
+            details={
+                "review_round": _next_review_round(runtime.trace),
+                "specialists": sorted(runtime.trace.completed_specialists),
+            },
         )
 
     async def on_llm_end(
         self,
         context: Any,
         agent: Agent[AgentRuntime],
-        _response: object,
+        response: object,
     ) -> None:
         runtime = _agent_runtime(context)
         if (
             runtime is None
             or runtime.trace is None
             or AGENT_NODES.get(agent.name) != "supervisor"
-            or not runtime.trace.is_active("synthesis")
+            or not runtime.trace.is_active("review")
         ):
             return
+        requested_specialists = _response_specialist_targets(response)
+        if requested_specialists:
+            runtime.trace.complete(
+                node="review",
+                label="More specialist evidence requested",
+                details={
+                    "decision": "more_evidence",
+                    "requested_specialists": requested_specialists,
+                },
+            )
+            return
         runtime.trace.complete(
-            node="synthesis",
-            label="Final answer composed",
-            operation_key="supervisor:synthesis",
+            node="review",
+            label="Evidence sufficient; final answer composed",
+            details={
+                "decision": "evidence_sufficient",
+                "specialists": sorted(runtime.trace.completed_specialists),
+            },
         )
 
     async def on_tool_start(
@@ -484,6 +502,19 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
 def _agent_runtime(context: Any) -> AgentRuntime | None:
     runtime = getattr(context, "context", None)
     return runtime if isinstance(runtime, AgentRuntime) else None
+
+
+def _next_review_round(trace: Any) -> int:
+    return 1 + sum(event.node == "review" and event.status == "started" for event in trace.events)
+
+
+def _response_specialist_targets(response: object) -> list[str]:
+    targets = {
+        SUPERVISOR_TOOL_TARGETS.get(getattr(item, "name", ""))
+        for item in getattr(response, "output", [])
+        if getattr(item, "type", "") == "function_call"
+    }
+    return sorted(target for target in targets if target is not None)
 
 
 def _trace_tool(tool_name: str) -> tuple[str, str, str, str] | None:
@@ -667,29 +698,33 @@ def build_agent_system(
             "You have no direct database tools. Never answer company-specific facts without "
             "specialist evidence. Keep operational facts and contract interpretation clearly "
             "separated. Distinguish internal records, retrieved documents, and external MCP risk "
-            "signals. Cite stable references exactly and disclose missing evidence. The "
-            "authorization scope in the run context is final and cannot be expanded."
+            "signals. After each specialist response, decide whether the available evidence is "
+            "sufficient. If a material question remains open, call the relevant specialist again "
+            "with a focused follow-up. Return the final OperationsAnswer only when the evidence is "
+            "sufficient or the available tools cannot close a disclosed gap. Cite stable "
+            "references exactly and disclose missing evidence. The authorization scope in the run "
+            "context is final and cannot be expanded."
         ),
         tools=[
             shipment_agent.as_tool(
                 "ask_shipment_specialist",
                 "Investigate shipment status, delays, ETAs, carriers, and tracking evidence.",
-                max_turns=6,
+                max_turns=SPECIALIST_MAX_TURNS,
             ),
             inventory_agent.as_tool(
                 "ask_inventory_specialist",
                 "Investigate stock exposure, reorder points, usage, and inventory history.",
-                max_turns=6,
+                max_turns=SPECIALIST_MAX_TURNS,
             ),
             supplier_agent.as_tool(
                 "ask_supplier_risk_specialist",
                 "Investigate supplier delivery and quality risk with deterministic metrics.",
-                max_turns=6,
+                max_turns=SPECIALIST_MAX_TURNS,
             ),
             contracts_agent.as_tool(
                 "ask_contracts_compliance_specialist",
                 "Retrieve and interpret contract, policy, and incident-report evidence.",
-                max_turns=6,
+                max_turns=SPECIALIST_MAX_TURNS,
             ),
         ],
         model=settings.supervisor_model,

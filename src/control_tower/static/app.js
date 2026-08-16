@@ -9,7 +9,7 @@ const TRACE_NODE_LABELS = {
   postgresql: "PostgreSQL",
   pgvector: "RAG retrieval",
   mcp: "External-risk MCP",
-  synthesis: "Final synthesis",
+  review: "Supervisor review",
   answer: "Answer",
 };
 
@@ -31,7 +31,7 @@ const ACTIVE_NODE_META = {
   postgresql: "Querying",
   pgvector: "Retrieving",
   mcp: "Fetching signals",
-  synthesis: "Composing",
+  review: "Evaluating",
   answer: "Preparing",
 };
 
@@ -40,7 +40,6 @@ const FLOW_TARGETS = {
   supervisor: ["supervisor"],
   specialists: [...SPECIALIST_NODES],
   sources: ["postgresql", "pgvector", "mcp"],
-  synthesis: ["synthesis"],
   answer: ["answer"],
 };
 
@@ -264,6 +263,9 @@ function resetTrace() {
   for (const connector of document.querySelectorAll(".trace-connector")) {
     connector.classList.remove("active", "completed", "failed");
   }
+  for (const path of document.querySelectorAll(".cycle-path, .decision-path")) {
+    path.classList.remove("active", "completed", "failed");
+  }
 
   elements.exchangeStatus.textContent = "Idle";
   elements.exchangeTitle.textContent = "No exchange selected";
@@ -283,6 +285,7 @@ function handleTraceEvent(event) {
   elements.eventCount.textContent = String(state.traceEvents.length);
   updateTraceNode(event);
   updateTraceFlow();
+  updateDecisionPaths();
   updateSupervisorPhase();
   appendTimelineEvent(event);
   selectTraceEvent(event);
@@ -331,9 +334,11 @@ function updateSupervisorPhase() {
   if (!supervisor || supervisor.dataset.state !== "active") return;
 
   const meta = supervisor.querySelector(".node-meta");
-  const synthesis = document.querySelector('.trace-node[data-node="synthesis"]');
-  if (synthesis?.dataset.state === "active") {
-    meta.textContent = "Synthesizing";
+  const latestReviewEvent = [...state.traceEvents].reverse().find((event) =>
+    event.node === "review"
+  );
+  if (latestReviewEvent?.status === "started") {
+    meta.textContent = "Reviewing evidence";
     return;
   }
 
@@ -343,6 +348,17 @@ function updateSupervisorPhase() {
   const activeCount = specialistStates.filter((nodeState) => nodeState === "active").length;
   if (activeCount) {
     meta.textContent = `Coordinating ${activeCount} ${activeCount === 1 ? "agent" : "agents"}`;
+    return;
+  }
+  const latestReview = [...state.traceEvents].reverse().find((event) =>
+    event.node === "review" && event.status === "completed"
+  );
+  if (latestReview?.details?.decision === "evidence_sufficient") {
+    meta.textContent = "Finalizing answer";
+    return;
+  }
+  if (latestReview?.details?.decision === "more_evidence") {
+    meta.textContent = "Routing follow-up";
     return;
   }
   if (specialistStates.some((nodeState) => nodeState === "completed")) {
@@ -367,6 +383,53 @@ function updateTraceFlow() {
     connector.classList.toggle("failed", !active && failed);
     connector.classList.toggle("completed", !active && !failed && reached);
   }
+}
+
+function updateDecisionPaths() {
+  const reviewEvents = state.traceEvents.filter((event) => event.node === "review");
+  const completedReviews = state.traceEvents.filter((event) =>
+    event.node === "review" && event.status === "completed"
+  );
+  const repeated = completedReviews.some((event) => event.details?.decision === "more_evidence");
+  const sufficient = completedReviews.some((event) =>
+    event.details?.decision === "evidence_sufficient"
+  );
+  const latestReview = completedReviews.at(-1);
+  const specialistActive = [...SPECIALIST_NODES].some((nodeName) =>
+    document.querySelector(`.trace-node[data-node="${nodeName}"]`)?.dataset.state === "active"
+  );
+  const latestReviewEvent = reviewEvents.at(-1);
+  const reviewActive = latestReviewEvent?.status === "started";
+  const reviewFailed = latestReviewEvent?.status === "failed";
+
+  const evidenceReturn = document.querySelector('[data-cycle-path="evidence-return"]');
+  evidenceReturn?.classList.toggle("active", reviewActive);
+  evidenceReturn?.classList.toggle(
+    "completed",
+    completedReviews.length > 0 && !reviewActive,
+  );
+  evidenceReturn?.classList.toggle("failed", reviewFailed);
+
+  const repeatPath = document.querySelector('[data-decision-path="more_evidence"]');
+  repeatPath?.classList.toggle(
+    "active",
+    latestReview?.details?.decision === "more_evidence" && specialistActive,
+  );
+  repeatPath?.classList.toggle("completed", repeated && !repeatPath.classList.contains("active"));
+  repeatPath?.classList.toggle("failed", reviewFailed);
+
+  const sufficientPath = document.querySelector('[data-decision-path="evidence_sufficient"]');
+  const answerState = document.querySelector('.trace-node[data-node="answer"]')
+    ?.dataset.state || "idle";
+  sufficientPath?.classList.toggle(
+    "active",
+    sufficient && !["completed", "failed"].includes(answerState),
+  );
+  sufficientPath?.classList.toggle("completed", sufficient && answerState === "completed");
+  sufficientPath?.classList.toggle(
+    "failed",
+    reviewFailed || answerState === "failed",
+  );
 }
 
 function appendTimelineEvent(event) {
@@ -398,8 +461,9 @@ function appendTimelineEvent(event) {
 
 function selectTraceEvent(event, reveal = false) {
   state.selectedTraceEvent = event;
+  const visualNode = event.node === "review" ? "supervisor" : event.node;
   for (const node of document.querySelectorAll(".trace-node")) {
-    node.classList.toggle("selected", node.dataset.node === event.node);
+    node.classList.toggle("selected", node.dataset.node === visualNode);
   }
   const completedEvent = event.status === "completed"
     ? event
@@ -412,7 +476,7 @@ function selectTraceEvent(event, reveal = false) {
     ? `${TRACE_NODE_LABELS[event.node]} exchange`
     : event.label;
   const source = event.source ? sourceLabel(event.source) : "Application";
-  const model = state.agentModels[event.node];
+  const model = state.agentModels[visualNode];
   elements.exchangeMeta.textContent = [
     TRACE_NODE_LABELS[event.node] || event.node,
     source,
@@ -1068,7 +1132,11 @@ for (const tab of document.querySelectorAll(".trace-tab")) {
 
 for (const node of document.querySelectorAll(".trace-node")) {
   node.addEventListener("click", () => {
-    const event = [...state.traceEvents].reverse().find((item) => item.node === node.dataset.node);
+    const reversedEvents = [...state.traceEvents].reverse();
+    const event = node.dataset.node === "supervisor"
+      ? reversedEvents.find((item) => item.node === "review")
+        || reversedEvents.find((item) => item.node === "supervisor")
+      : reversedEvents.find((item) => item.node === node.dataset.node);
     if (event) selectTraceEvent(event, true);
   });
 }

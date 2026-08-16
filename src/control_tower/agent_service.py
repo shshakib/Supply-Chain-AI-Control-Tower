@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from control_tower.access import AccessContext
-from control_tower.agents.llm import OperationsAnswer, build_agent_system
+from control_tower.agents.llm import SUPERVISOR_MAX_TURNS, OperationsAnswer, build_agent_system
 from control_tower.agents.runtime import AgentRuntime, ToolEvent
 from control_tower.config import Settings
 from control_tower.conversations import ConversationMessage
@@ -118,7 +118,7 @@ class AgentService:
                 self.supervisor,
                 prompt,
                 context=runtime,
-                max_turns=14,
+                max_turns=SUPERVISOR_MAX_TURNS,
             )
         except Exception:
             if trace is not None:
@@ -126,17 +126,11 @@ class AgentService:
             raise
         output = self._coerce_output(result.final_output)
         if trace is not None:
-            if trace.is_active("synthesis"):
-                trace.complete(
-                    node="synthesis",
-                    label="Final answer composed",
-                    operation_key="supervisor:synthesis",
-                )
             trace.start(
                 event_type="answer",
                 node="answer",
                 label="Preparing cited answer",
-                parent_node="synthesis",
+                parent_node="review" if trace.was_started("review") else "supervisor",
                 source="application",
             )
             trace.complete(

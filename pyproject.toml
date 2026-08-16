@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "supply-chain-ai-control-tower"
-version = "0.6.0"
+version = "0.9.4"
 description = "A deterministically authorized multi-agent supply-chain control tower"
 readme = "README.md"
 requires-python = ">=3.11"

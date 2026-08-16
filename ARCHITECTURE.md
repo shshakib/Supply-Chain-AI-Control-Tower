@@ -4,26 +4,46 @@
 
 Start here for the interview-level view. Deterministic application code controls access and data
 retrieval; the model chooses specialists and synthesizes only the evidence returned by typed local
-tools, semantic retrieval, and allowlisted MCP tools.
+tools, semantic retrieval, and allowlisted MCP tools. Specialist reports return to the same
+supervisor, which makes a bounded stop-or-delegate decision after every evidence-gathering round.
 
 ```mermaid
 flowchart TB
     USER["Operations user"] --> UI["Web console or CLI"]
     UI --> ACCESS["Deterministic access control"]
     ACCESS --> SUPERVISOR["Supervisor agent<br/>Configured orchestration model"]
-    SUPERVISOR --> SPECIALISTS["Specialist agents<br/>Shipments, inventory,<br/>supplier risk, contracts<br/>Per-agent model assignments"]
 
-    SPECIALISTS --> DB["PostgreSQL<br/>Typed operational tools"]
-    SPECIALISTS --> RAG["pgvector<br/>Semantic search and RAG"]
-    SPECIALISTS --> MCP["External risk MCP<br/>Read-only disruption tools"]
+    subgraph LOOP["Bounded evidence gathering<br/>14 supervisor turns maximum"]
+        direction TB
+        subgraph SPECIALISTS["Specialist agents<br/>Independent models; 6 turns per invocation"]
+            direction LR
+            SHIPMENT["Shipment"]
+            INVENTORY["Inventory"]
+            SUPPLIER["Supplier risk"]
+            CONTRACTS["Contracts"]
+        end
 
-    DB --> SYNTHESIS["LLM evidence synthesis"]
-    RAG --> SYNTHESIS
-    MCP --> SYNTHESIS
-    SYNTHESIS --> ANSWER["Cited operational answer"]
+        subgraph SOURCES["Evidence sources"]
+            direction LR
+            DB["PostgreSQL<br/>Typed operational tools"]
+            RAG["pgvector<br/>Semantic search + RAG"]
+            MCP["External risk MCP<br/>Read-only tools"]
+        end
+
+        SPECIALISTS -->|"Use scoped tools"| SOURCES
+    end
+
+    SUPERVISOR <-->|"Delegate or request follow-up<br/>Structured reports return"| SPECIALISTS
+    SUPERVISOR -->|"Evidence sufficient"| ANSWER["Compose cited OperationsAnswer"]
+
+    %% Preserve top-to-bottom placement without implying a source-to-answer data path.
+    SOURCES ~~~ ANSWER
 
     SUPERVISOR -. "execution events" .-> TRACE["Live observability<br/>Map, timeline, evidence"]
-    SPECIALISTS -. "tool events" .-> TRACE
+    SPECIALISTS -. "agent and tool events" .-> TRACE
+
+    classDef supervisorNode stroke-width:3px,font-size:18px,font-weight:700;
+    class SUPERVISOR supervisorNode;
 ```
 
 ## Detailed Implementation Map
@@ -57,7 +77,9 @@ flowchart TB
     subgraph ORCHESTRATION["3. Multi-agent orchestration"]
         direction TB
         RUNNER["OpenAI Agents SDK runner<br/>Structured Pydantic outputs"]:::agent
-        SUPERVISOR["Supervisor agent<br/>Can call specialists only<br/>Independent model assignment<br/>No direct database access"]:::agent
+        SUPERVISOR["Single supervisor agent<br/>Plans, reviews evidence, and decides<br/>Independent model assignment<br/>14-turn hard stop"]:::agent
+        REPORTS["Structured SpecialistReport<br/>Evidence + limitations"]:::agent
+        FINAL["Structured OperationsAnswer<br/>Cited final response"]:::agent
 
         subgraph SPECIALISTS["Specialists exposed to the supervisor as tools"]
             direction LR
@@ -69,10 +91,16 @@ flowchart TB
 
         AGENT_FILES["Files<br/>src/control_tower/agents/llm.py<br/>src/control_tower/agents/__init__.py"]:::files
         RUNNER --> SUPERVISOR
-        SUPERVISOR --> SHIPMENT
-        SUPERVISOR --> INVENTORY
-        SUPERVISOR --> SUPPLIER
-        SUPERVISOR --> CONTRACTS
+        SUPERVISOR -->|"Delegate or follow up"| SHIPMENT
+        SUPERVISOR -->|"Delegate or follow up"| INVENTORY
+        SUPERVISOR -->|"Delegate or follow up"| SUPPLIER
+        SUPERVISOR -->|"Delegate or follow up"| CONTRACTS
+        SHIPMENT --> REPORTS
+        INVENTORY --> REPORTS
+        SUPPLIER --> REPORTS
+        CONTRACTS --> REPORTS
+        REPORTS -->|"Return to same supervisor"| SUPERVISOR
+        SUPERVISOR -->|"Evidence sufficient"| FINAL
     end
 
     subgraph DOMAIN["4. Deterministic domain tools and retrieval"]
@@ -216,8 +244,10 @@ flowchart TB
 8. The MCP server deterministically filters its separate synthetic feed and returns structured
    `external-risk:` evidence. If startup fails, the agent system is rebuilt without MCP and local
    analysis remains available.
-9. Specialists return structured findings and evidence to the supervisor LLM, which composes the
-   final operational answer.
+9. Specialists return structured findings and evidence to the supervisor. On its next model turn,
+   it either requests focused follow-up evidence or returns the final structured operational
+   answer. This review can repeat, but the supervisor run stops after at most 14 turns and every
+   nested specialist invocation stops after at most 6 turns.
 10. Conversation history is persisted under the owning user, and source-aware tool events provide
    a visible PostgreSQL, pgvector, and MCP execution trace.
 11. The API publishes redacted lifecycle events over SSE; the UI maps them to live node states,

@@ -9,6 +9,7 @@ from control_tower.agents.specialists import (
     ShipmentSpecialist,
 )
 from control_tower.agents.supervisor import SupplyRiskSupervisor
+from control_tower.observability import ExecutionTrace
 from control_tower.synthetic import DEMO_AS_OF
 from control_tower.tools import DocumentTools, InventoryTools, ShipmentTools
 
@@ -41,6 +42,23 @@ def test_supervisor_combines_structured_and_document_findings(session: Session) 
         "shipments",
         "contracts_and_documents",
     ]
+
+
+def test_offline_trace_exercises_bounded_evidence_review_loop(session: Session) -> None:
+    access = AccessService(session).resolve(
+        "noah.east@controltower.demo",
+        "meridian-assembly",
+    )
+    trace = ExecutionTrace(run_id="offline-review-test")
+
+    build_supervisor(session).analyze(QUESTION, access, as_of=DEMO_AS_OF, trace=trace)
+
+    decisions = [
+        event.details["decision"]
+        for event in trace.events
+        if event.node == "review" and event.status == "completed"
+    ]
+    assert decisions == ["more_evidence", "evidence_sufficient"]
 
 
 def test_supervisor_result_respects_regional_scope(session: Session) -> None:

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
+from control_tower import __version__
 from control_tower.agent_service import AgentRunResponse
 from control_tower.agents.llm import OperationsAnswer
 from control_tower.agents.runtime import ToolEvent
@@ -66,7 +67,18 @@ def test_web_chat_persists_scoped_conversation(engine: Engine) -> None:
         assert "Suggested inquiries" in index.text
         assert 'id="theme-toggle"' in index.text
         assert 'data-flow="specialists"' in index.text
+        assert 'data-flow="sources"' in index.text
+        assert 'data-flow="answer"' not in index.text
+        assert 'class="specialist-evidence-stage"' in index.text
+        assert 'data-cycle-path="evidence-return"' in index.text
+        assert 'data-decision-path="more_evidence"' in index.text
+        assert 'data-decision-path="evidence_sufficient"' in index.text
+        assert index.text.count('data-node="supervisor"') == 1
+        assert 'data-node="review"' not in index.text
         assert 'data-agent-model="supervisor"' in index.text
+        assert f"/static/styles.css?v={__version__}" in index.text
+        assert f"/static/app.js?v={__version__}" in index.text
+        assert app.version == __version__
         assert len(client.get("/api/personas").json()) == 6
         health = client.get("/api/health").json()
         assert health["external_risk_mcp"]["state"] == "connected"
@@ -129,7 +141,7 @@ def test_demo_stream_emits_live_trace_and_final_result(engine: Engine) -> None:
         "contracts_compliance",
         "postgresql",
         "pgvector",
-        "synthesis",
+        "review",
         "answer",
     }.issubset(nodes)
     assert any(event["node"] == "mcp" and event["status"] == "skipped" for event in trace_events)

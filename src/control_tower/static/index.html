@@ -18,7 +18,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=0.6.0">
+    <link rel="stylesheet" href="/static/styles.css?v=0.9.4">
   </head>
   <body>
     <div class="app-shell">
@@ -214,88 +214,121 @@
                 <span class="node-meta">Deterministic</span>
               </button>
               <span class="trace-connector" data-flow="supervisor" aria-hidden="true"></span>
-              <button class="trace-node" type="button" data-node="supervisor">
-                <span class="node-indicator"></span>
-                <span class="node-copy">
-                  <span class="node-label">Supervisor</span>
-                  <span class="node-model" data-agent-model="supervisor">Model</span>
-                </span>
-                <span class="node-meta">Router</span>
-              </button>
-
-              <span class="trace-connector" data-flow="specialists" aria-hidden="true"></span>
-              <span class="map-group-label">Specialists</span>
-              <div class="trace-node-grid specialists-grid">
-                <button class="trace-node compact" type="button" data-node="shipments">
-                  <span class="node-indicator"></span>
-                  <span class="node-copy">
-                    <span class="node-label">Shipments</span>
-                    <span class="node-model" data-agent-model="shipments">Model</span>
-                  </span>
-                  <span class="node-meta">Agent</span>
-                </button>
-                <button class="trace-node compact" type="button" data-node="inventory">
-                  <span class="node-indicator"></span>
-                  <span class="node-copy">
-                    <span class="node-label">Inventory</span>
-                    <span class="node-model" data-agent-model="inventory">Model</span>
-                  </span>
-                  <span class="node-meta">Agent</span>
-                </button>
-                <button class="trace-node compact" type="button" data-node="supplier_risk">
-                  <span class="node-indicator"></span>
-                  <span class="node-copy">
-                    <span class="node-label">Supplier risk</span>
-                    <span class="node-model" data-agent-model="supplier_risk">Model</span>
-                  </span>
-                  <span class="node-meta">Agent</span>
-                </button>
-                <button
-                  class="trace-node compact"
-                  type="button"
-                  data-node="contracts_compliance"
+              <div class="answer-route">
+                <span
+                  class="answer-route-path decision-path"
+                  data-decision-path="evidence_sufficient"
+                  aria-label="Evidence sufficient path from the supervisor to the answer"
                 >
-                  <span class="node-indicator"></span>
-                  <span class="node-copy">
-                    <span class="node-label">Contracts</span>
-                    <span class="node-model" data-agent-model="contracts_compliance">Model</span>
-                  </span>
-                  <span class="node-meta">Agent</span>
-                </button>
-              </div>
+                  <span class="answer-route-arrow"></span>
+                </span>
 
-              <span class="trace-connector" data-flow="sources" aria-hidden="true"></span>
-              <span class="map-group-label">Evidence sources</span>
-              <div class="trace-node-grid source-grid">
-                <button class="trace-node compact" type="button" data-node="postgresql">
-                  <span class="node-indicator"></span>
-                  <span class="node-label">PostgreSQL</span>
-                  <span class="node-meta">Typed tools</span>
-                </button>
-                <button class="trace-node compact" type="button" data-node="pgvector">
-                  <span class="node-indicator"></span>
-                  <span class="node-label">RAG</span>
-                  <span class="node-meta">Retrieval</span>
-                </button>
-                <button class="trace-node compact" type="button" data-node="mcp">
-                  <span class="node-indicator"></span>
-                  <span class="node-label">MCP</span>
-                  <span class="node-meta">External risk</span>
-                </button>
-              </div>
+                <div class="answer-route-main">
+                  <button class="trace-node" type="button" data-node="supervisor">
+                    <span class="node-indicator"></span>
+                    <span class="node-copy">
+                      <span class="node-label">Supervisor</span>
+                      <span class="node-model" data-agent-model="supervisor">Model</span>
+                    </span>
+                    <span class="node-meta">Router</span>
+                  </button>
 
-              <span class="trace-connector" data-flow="synthesis" aria-hidden="true"></span>
-              <button class="trace-node" type="button" data-node="synthesis">
-                <span class="node-indicator"></span>
-                <span class="node-label">Synthesis</span>
-                <span class="node-meta">Final composition</span>
-              </button>
-              <span class="trace-connector" data-flow="answer" aria-hidden="true"></span>
-              <button class="trace-node" type="button" data-node="answer">
-                <span class="node-indicator"></span>
-                <span class="node-label">Answer</span>
-                <span class="node-meta">Cited output</span>
-              </button>
+                  <div class="handoff-pair" aria-label="Supervisor and specialist handoff">
+                    <span
+                      class="handoff-channel delegation-path decision-path"
+                      data-decision-path="more_evidence"
+                    >
+                      <span
+                        class="trace-connector handoff-arrow-down"
+                        data-flow="specialists"
+                        aria-hidden="true"
+                      ></span>
+                    </span>
+                    <span
+                      class="handoff-channel handoff-arrow-up cycle-path"
+                      data-cycle-path="evidence-return"
+                      aria-label="Evidence reports return to the supervisor"
+                    ></span>
+                  </div>
+
+                  <div
+                    class="specialist-evidence-stage"
+                    aria-label="Specialist agents and their evidence sources"
+                  >
+                    <span class="map-group-label specialists-group-label">Specialist agents</span>
+                    <div class="trace-node-grid specialists-grid">
+                      <button class="trace-node compact" type="button" data-node="shipments">
+                        <span class="node-indicator"></span>
+                        <span class="node-copy">
+                          <span class="node-label">Shipments</span>
+                          <span class="node-model" data-agent-model="shipments">Model</span>
+                        </span>
+                        <span class="node-meta">Agent</span>
+                      </button>
+                      <button class="trace-node compact" type="button" data-node="inventory">
+                        <span class="node-indicator"></span>
+                        <span class="node-copy">
+                          <span class="node-label">Inventory</span>
+                          <span class="node-model" data-agent-model="inventory">Model</span>
+                        </span>
+                        <span class="node-meta">Agent</span>
+                      </button>
+                      <button class="trace-node compact" type="button" data-node="supplier_risk">
+                        <span class="node-indicator"></span>
+                        <span class="node-copy">
+                          <span class="node-label">Supplier risk</span>
+                          <span class="node-model" data-agent-model="supplier_risk">Model</span>
+                        </span>
+                        <span class="node-meta">Agent</span>
+                      </button>
+                      <button
+                        class="trace-node compact"
+                        type="button"
+                        data-node="contracts_compliance"
+                      >
+                        <span class="node-indicator"></span>
+                        <span class="node-copy">
+                          <span class="node-label">Contracts</span>
+                          <span class="node-model" data-agent-model="contracts_compliance">
+                            Model
+                          </span>
+                        </span>
+                        <span class="node-meta">Agent</span>
+                      </button>
+                    </div>
+
+                    <span
+                      class="trace-connector source-use-connector"
+                      data-flow="sources"
+                      aria-label="Specialists use evidence sources"
+                    ></span>
+                    <span class="map-group-label sources-group-label">Evidence sources</span>
+                    <div class="trace-node-grid source-grid">
+                      <button class="trace-node compact" type="button" data-node="postgresql">
+                        <span class="node-indicator"></span>
+                        <span class="node-label">PostgreSQL</span>
+                        <span class="node-meta">Typed tools</span>
+                      </button>
+                      <button class="trace-node compact" type="button" data-node="pgvector">
+                        <span class="node-indicator"></span>
+                        <span class="node-label">RAG</span>
+                        <span class="node-meta">Retrieval</span>
+                      </button>
+                      <button class="trace-node compact" type="button" data-node="mcp">
+                        <span class="node-indicator"></span>
+                        <span class="node-label">MCP</span>
+                        <span class="node-meta">External risk</span>
+                      </button>
+                    </div>
+                  </div>
+                  <span class="answer-separator" aria-hidden="true"></span>
+                  <button class="trace-node" type="button" data-node="answer">
+                    <span class="node-indicator"></span>
+                    <span class="node-label">Answer</span>
+                    <span class="node-meta">Cited output</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="exchange-inspector" id="exchange-inspector">
@@ -338,6 +371,6 @@
       </aside>
     </div>
 
-    <script src="/static/app.js?v=0.6.0" defer></script>
+    <script src="/static/app.js?v=0.9.4" defer></script>
   </body>
 </html>

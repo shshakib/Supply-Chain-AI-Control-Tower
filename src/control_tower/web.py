@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, func, select
 
+from control_tower import __version__
 from control_tower.access import AccessDeniedError, AccessService
 from control_tower.agent_service import AgentService, MissingOpenAIConfiguration
 from control_tower.agents.specialists import (
@@ -161,7 +162,7 @@ def create_app(
 
     app = FastAPI(
         title="Supply Chain AI Control Tower",
-        version="0.6.0",
+        version=__version__,
         lifespan=lifespan,
     )
     app.state.settings = app_settings

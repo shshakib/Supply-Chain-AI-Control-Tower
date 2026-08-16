@@ -152,6 +152,27 @@ class SupplyRiskSupervisor:
         top_shipment = affected_shipments[0]
         risk = risks_by_sku[top_shipment["sku"]]
         if trace is not None:
+            trace.start(
+                event_type="review",
+                node="review",
+                label="Reviewing operational evidence",
+                parent_node="supervisor",
+                source="application",
+                details={
+                    "review_round": 1,
+                    "specialists": sorted(trace.completed_specialists),
+                },
+                operation_key="offline:review:1",
+            )
+            trace.complete(
+                node="review",
+                label="Additional contract evidence required",
+                details={
+                    "decision": "more_evidence",
+                    "requested_specialists": ["contracts_compliance"],
+                },
+                operation_key="offline:review:1",
+            )
             trace.info(
                 event_type="routing",
                 node="supervisor",
@@ -219,13 +240,16 @@ class SupplyRiskSupervisor:
 
         if trace is not None:
             trace.start(
-                event_type="synthesis",
-                node="synthesis",
-                label="Combining operational and contract findings",
+                event_type="review",
+                node="review",
+                label="Reviewing complete specialist evidence",
                 parent_node="supervisor",
                 source="application",
-                details={"specialists": sorted(trace.completed_specialists)},
-                operation_key="offline:synthesis",
+                details={
+                    "review_round": 2,
+                    "specialists": sorted(trace.completed_specialists),
+                },
+                operation_key="offline:review:2",
             )
         answer = (
             f"{top_shipment['warehouse_code']} is at immediate risk for "
@@ -238,9 +262,13 @@ class SupplyRiskSupervisor:
         )
         if trace is not None:
             trace.complete(
-                node="synthesis",
-                label="Operational answer composed",
-                operation_key="offline:synthesis",
+                node="review",
+                label="Evidence sufficient; operational answer composed",
+                details={
+                    "decision": "evidence_sufficient",
+                    "specialists": sorted(trace.completed_specialists),
+                },
+                operation_key="offline:review:2",
             )
         self._finish_trace(trace, answer=answer, used_contracts=True)
         return SupplyRiskReport(question=question, answer=answer, findings=findings)
@@ -254,19 +282,27 @@ class SupplyRiskSupervisor:
     ) -> None:
         if trace is None:
             return
-        if not trace.was_started("synthesis"):
+        if not trace.was_started("review"):
             trace.start(
-                event_type="synthesis",
-                node="synthesis",
-                label="Combining specialist findings",
+                event_type="review",
+                node="review",
+                label="Reviewing specialist findings",
                 parent_node="supervisor",
                 source="application",
-                operation_key="offline:synthesis",
+                details={
+                    "review_round": 1,
+                    "specialists": sorted(trace.completed_specialists),
+                },
+                operation_key="offline:review:1",
             )
             trace.complete(
-                node="synthesis",
-                label="Operational answer composed",
-                operation_key="offline:synthesis",
+                node="review",
+                label="Evidence sufficient; operational answer composed",
+                details={
+                    "decision": "evidence_sufficient",
+                    "specialists": sorted(trace.completed_specialists),
+                },
+                operation_key="offline:review:1",
             )
         trace.complete(
             node="supervisor",
@@ -277,7 +313,7 @@ class SupplyRiskSupervisor:
             event_type="answer",
             node="answer",
             label="Preparing answer",
-            parent_node="synthesis",
+            parent_node="review",
             source="application",
         )
         trace.complete(

@@ -16,30 +16,52 @@ tools, and interface were designed independently for this project.
 flowchart TB
     USER["Operations user"] --> UI["Web console or CLI"]
     UI --> ACCESS["Deterministic access control"]
-    ACCESS --> SUPERVISOR["Supervisor agent"]
-    SUPERVISOR --> SPECIALISTS["Specialist agents<br/>Shipments, inventory,<br/>supplier risk, contracts"]
+    ACCESS --> SUPERVISOR["Supervisor agent<br/>Route, review, decide"]
 
-    SPECIALISTS --> DB["PostgreSQL<br/>Typed operational tools"]
-    SPECIALISTS --> RAG["pgvector<br/>Semantic search and RAG"]
-    SPECIALISTS --> MCP["External risk MCP<br/>Read-only disruption tools"]
+    subgraph LOOP["Bounded evidence gathering"]
+        direction LR
+        subgraph SPECIALISTS["Specialist agents"]
+            direction TB
+            SHIPMENT["Shipment"]
+            INVENTORY["Inventory"]
+            SUPPLIER["Supplier risk"]
+            CONTRACTS["Contracts"]
+        end
 
-    DB --> SYNTHESIS["LLM evidence synthesis"]
-    RAG --> SYNTHESIS
-    MCP --> SYNTHESIS
-    SYNTHESIS --> ANSWER["Cited operational answer"]
+        subgraph SOURCES["Evidence sources"]
+            direction TB
+            DB["PostgreSQL<br/>Typed tools"]
+            RAG["pgvector<br/>Semantic search + RAG"]
+            MCP["External risk MCP<br/>Read-only tools"]
+        end
+
+        SPECIALISTS -->|"Use scoped tools"| SOURCES
+    end
+
+    SUPERVISOR <-->|"Delegate or request follow-up<br/>Structured reports return"| SPECIALISTS
+    SUPERVISOR -->|"Evidence sufficient"| ANSWER["Compose cited operational answer"]
+
+    %% Preserve top-to-bottom placement without implying a source-to-answer data path.
+    SOURCES ~~~ ANSWER
 
     SUPERVISOR -. "execution events" .-> TRACE["Live observability<br/>Map, timeline, evidence"]
-    SPECIALISTS -. "tool events" .-> TRACE
+    SPECIALISTS -. "agent and tool events" .-> TRACE
+
+    classDef supervisorNode stroke-width:3px,font-size:18px,font-weight:700;
+    class SUPERVISOR supervisorNode;
 ```
 
 This is the interview-level view. [Open the detailed implementation map](ARCHITECTURE.md) for
 the complete request flow, trust boundaries, service relationships, and files owned by each
 architectural segment.
 
-The supervisor calls specialists as tools using the OpenAI Agents SDK. Specialists can call
-only their own typed tools. A local `AgentRuntime` carries the authenticated access context,
-database session, fixed as-of date, retriever, and tool-event trace. That context is not a
-model-editable argument.
+The supervisor calls specialists as tools using the OpenAI Agents SDK. Each structured specialist
+report returns to the same supervisor, which either requests focused follow-up evidence or returns
+the final `OperationsAnswer`. There is no separate post-processing LLM. The loop is bounded at 14
+supervisor turns, and every specialist invocation is bounded at 6 turns. Specialists can call only
+their own typed tools. A local `AgentRuntime` carries the authenticated access context, database
+session, fixed as-of date, retriever, and tool-event trace. That context is not a model-editable
+argument.
 
 MCP has one specific job: shipment, supplier-risk, and compliance specialists use it to read
 synthetic external disruption intelligence. Internal shipments, inventory, authorization, and
@@ -49,6 +71,7 @@ not receive tenant IDs or database credentials.
 ## Implemented Capabilities
 
 - OpenAI Agents SDK supervisor with four specialist agents
+- Bounded supervisor evidence-review loop with explicit stop-or-delegate decisions
 - Server-controlled per-agent model assignments with a shared specialist fallback
 - Pydantic structured outputs for specialist reports and final answers
 - Deterministic organization, warehouse, supplier, and conversation authorization
@@ -96,8 +119,9 @@ control-tower-web --database-url "sqlite:///./control_tower.db"  # terminal 2
 
 **Run offline scenario** uses the deterministic local workflow and
 works without an API key. Its Live Map shows access resolution, routing, specialist work, data
-sources, synthesis, and the final answer as they execute. LLM chat requires `OPENAI_API_KEY`; it
-uses the same trace and calls the MCP service when an external signal is relevant.
+sources, supervisor evidence review, and the final answer as they execute. LLM chat requires
+`OPENAI_API_KEY`; it uses the same trace and calls the MCP service when an external signal is
+relevant.
 
 ## VS Code Tasks And Debugging
 
@@ -148,16 +172,24 @@ and uses the official [MCP Python SDK](https://github.com/modelcontextprotocol/p
 Both `/api/chat/stream` and `/api/demo/stream` return Server-Sent Events. The browser renders
 those events in three coordinated views:
 
-- **Map** lights up the deterministic access boundary, supervisor, specialists, PostgreSQL,
-  RAG retrieval, MCP, synthesis, and answer nodes.
+- **Map** lights up the deterministic access boundary, the single supervisor, specialists,
+  PostgreSQL, RAG retrieval, MCP, and the answer. Paired arrows between the supervisor and
+  specialists distinguish downward delegation from upward evidence return. A shared execution-stage
+  frame groups the specialists with their evidence sources, and a centered connector shows that tool
+  flow without implying a direct source-to-answer path. A single left-side route from the supervisor
+  lights only when it has enough evidence.
 - **Timeline** preserves the exact event order with source labels and measured durations.
 - **Evidence** shows the durable tool records and citations returned with the answer.
 
 The supervisor is the parent orchestration span, so it remains active while delegated specialists
-run and while their evidence is synthesized. Its map label changes from planning to coordinating,
-reviewing evidence, and synthesizing so the open span is not mistaken for one continuous model
-call. Directional connectors show which stage is active or complete, and the light/dark theme
-preference is stored locally in the browser.
+run and while it reviews their reports. Each review is a distinct model turn: it either emits a
+`more_evidence` decision and loops to a specialist, or emits `evidence_sufficient` while composing
+the final structured answer. The Agents SDK hard limit of 14 supervisor turns, plus the 6-turn
+limit on each specialist invocation, prevents an infinite agent loop. Its map label changes from
+planning to coordinating, reviewing evidence, and finalizing so the open span is not mistaken for
+one continuous model call. Review events in the timeline select the same supervisor map node rather
+than implying a second reviewer agent. Directional connectors show which stage is active or
+complete, and the light/dark theme preference is stored locally in the browser.
 
 Selecting a specialist map node opens a safe input/output exchange: the delegated supervisor task,
 the specialist's structured summary, cited evidence claims, limitations, and duration. Tool nodes
