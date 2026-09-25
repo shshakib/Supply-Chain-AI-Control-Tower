@@ -30,6 +30,7 @@ from control_tower.agents.supervisor import SupplyRiskSupervisor
 from control_tower.config import Settings, get_settings
 from control_tower.conversations import ConversationService
 from control_tower.database import create_database_engine, session_scope
+from control_tower.limits import RunLimitExceeded
 from control_tower.models import DocumentChunk, Membership, Organization, User
 from control_tower.observability import ExecutionEvent, ExecutionTrace
 from control_tower.synthetic import DEMO_AS_OF
@@ -182,20 +183,16 @@ def create_app(
     async def health() -> dict:
         with session_scope(app_engine) as session:
             total_chunks = session.scalar(select(func.count(DocumentChunk.id))) or 0
-            if app_engine.dialect.name == "sqlite":
-                indexed_chunks = sum(
-                    vector is not None
-                    for vector in session.scalars(select(DocumentChunk.embedding)).all()
-                )
-            else:
-                indexed_chunks = (
-                    session.scalar(
-                        select(func.count(DocumentChunk.id)).where(
-                            DocumentChunk.embedding.is_not(None)
-                        )
+            indexed_chunks = (
+                session.scalar(
+                    select(func.count(DocumentChunk.id)).where(
+                        DocumentChunk.embedding.is_not(None),
+                        DocumentChunk.embedding_model == app_settings.embedding_model,
+                        DocumentChunk.embedding_dimensions == app_settings.embedding_dimensions,
                     )
-                    or 0
                 )
+                or 0
+            )
         risk_mcp_status = getattr(
             app_agent_service,
             "mcp_status",
@@ -327,6 +324,9 @@ def create_app(
             except MissingOpenAIConfiguration as exc:
                 trace.fail_open_operations("LLM configuration is missing")
                 raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except RunLimitExceeded as exc:
+                trace.fail_open_operations(str(exc))
+                raise HTTPException(status_code=429, detail=str(exc)) from exc
             except Exception:
                 trace.fail_open_operations("Agent run failed")
                 raise

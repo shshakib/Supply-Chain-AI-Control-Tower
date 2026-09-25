@@ -34,7 +34,7 @@ control-tower-web = "control_tower.web:main"
 control-tower-risk-mcp = "control_tower.integrations.risk_mcp_server:main"
 
 [tool.setuptools.package-data]
-control_tower = ["static/*", "migrations/*.mako"]
+control_tower = ["static/*", "migrations/*.mako", "evals/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

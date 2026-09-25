@@ -16,4 +16,6 @@ __pycache__
 credentials*.json
 service-account*.json
 *.log
+*.dump
+.pytest_tmp
 synthetic_documents/*.md

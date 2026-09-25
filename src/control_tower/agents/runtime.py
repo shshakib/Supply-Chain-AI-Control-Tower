@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from control_tower.access import AccessContext
 from control_tower.analytics import ScopeResolver
+from control_tower.limits import RunBudget
 from control_tower.models import Warehouse
 from control_tower.observability import ExecutionTrace
 from control_tower.retrieval import HybridDocumentRetriever
@@ -32,6 +33,8 @@ class AgentRuntime:
     retriever: HybridDocumentRetriever
     trace: ExecutionTrace | None = None
     events: list[ToolEvent] = field(default_factory=list)
+    budget: RunBudget | None = None
+    observed_references: set[str] = field(default_factory=set)
 
     @property
     def resolver(self) -> ScopeResolver:

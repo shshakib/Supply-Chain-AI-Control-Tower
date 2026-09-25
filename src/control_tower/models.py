@@ -274,7 +274,8 @@ class Document(IdMixin, TimestampMixin, Base):
     source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
 
 
-embedding_type = Vector(384).with_variant(JSON(none_as_null=True), "sqlite")
+EMBEDDING_DIMENSIONS = 384
+embedding_type = Vector(EMBEDDING_DIMENSIONS).with_variant(JSON(none_as_null=True), "sqlite")
 
 
 class DocumentChunk(IdMixin, Base):
@@ -289,6 +290,8 @@ class DocumentChunk(IdMixin, Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chunk_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(embedding_type)
+    embedding_model: Mapped[str | None] = mapped_column(String(255))
+    embedding_dimensions: Mapped[int | None] = mapped_column(Integer)
 
 
 class Conversation(IdMixin, TimestampMixin, Base):

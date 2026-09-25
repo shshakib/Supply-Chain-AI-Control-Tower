@@ -324,7 +324,9 @@ function updateTraceNode(event) {
   if (nodeState !== "idle") node.classList.add(nodeState);
   const meta = node.querySelector(".node-meta");
   if (nodeState === "active") meta.textContent = ACTIVE_NODE_META[event.node] || "Working";
-  if (nodeState === "completed") meta.textContent = formatDuration(event.duration_ms) || "Complete";
+  if (nodeState === "completed" && event.status === "completed") {
+    meta.textContent = formatDuration(event.duration_ms) || "Complete";
+  }
   if (nodeState === "failed") meta.textContent = "Failed";
   if (nodeState === "skipped") meta.textContent = "Skipped";
 }
@@ -337,6 +339,10 @@ function updateSupervisorPhase() {
   const latestReviewEvent = [...state.traceEvents].reverse().find((event) =>
     event.node === "review"
   );
+  if (latestReviewEvent?.details?.decision === "pending_validation") {
+    meta.textContent = "Validating answer";
+    return;
+  }
   if (latestReviewEvent?.status === "started") {
     meta.textContent = "Reviewing evidence";
     return;
@@ -399,7 +405,8 @@ function updateDecisionPaths() {
     document.querySelector(`.trace-node[data-node="${nodeName}"]`)?.dataset.state === "active"
   );
   const latestReviewEvent = reviewEvents.at(-1);
-  const reviewActive = latestReviewEvent?.status === "started";
+  const reviewActive = latestReviewEvent?.status === "started" ||
+    latestReviewEvent?.details?.decision === "pending_validation";
   const reviewFailed = latestReviewEvent?.status === "failed";
 
   const evidenceReturn = document.querySelector('[data-cycle-path="evidence-return"]');

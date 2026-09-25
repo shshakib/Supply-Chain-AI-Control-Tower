@@ -2,99 +2,55 @@
 
 [![CI](https://github.com/shshakib/Supply-Chain-AI-Control-Tower/actions/workflows/ci.yml/badge.svg)](https://github.com/shshakib/Supply-Chain-AI-Control-Tower/actions/workflows/ci.yml)
 
-Supply Chain AI Control Tower is an original, synthetic supply-chain intelligence application
-for a technical portfolio. It combines a manager-style multi-agent workflow, deterministic
-authorization, typed database tools, PostgreSQL/pgvector retrieval, persistent conversations,
-a separately deployed Model Context Protocol (MCP) risk feed, and a focused operations console.
+Ask a supply-chain question and get an answer backed by shipment records, stock levels,
+supplier history, and contracts.
 
-No private source code or private data is included. The schema, prompts, synthetic scenarios,
-tools, and interface were designed independently for this project.
+For example: **"Could this delayed shipment stop production in Toronto, and what can we do about it?"**
+The app checks the relevant records, looks for external disruption reports, and brings the findings
+together with citations. You can also see which agents ran, which tools they used, and what they returned.
 
-## Architecture
+I built this as a portfolio project to explore multi-agent workflows, RAG, and MCP in one working
+application. All companies, people, documents, and events are synthetic. It does not include private
+source code or real business data.
 
-```mermaid
-flowchart TB
-    USER["Operations user"] --> UI["Web console or CLI"]
-    UI --> ACCESS["Deterministic access control"]
-    ACCESS --> SUPERVISOR["Supervisor agent<br/>Route, review, decide"]
+## A Look Inside
 
-    subgraph LOOP["Bounded evidence gathering"]
-        direction LR
-        subgraph SPECIALISTS["Specialist agents"]
-            direction TB
-            SHIPMENT["Shipment"]
-            INVENTORY["Inventory"]
-            SUPPLIER["Supplier risk"]
-            CONTRACTS["Contracts"]
-        end
+**An operational answer with its execution map.**
 
-        subgraph SOURCES["Evidence sources"]
-            direction TB
-            DB["PostgreSQL<br/>Typed tools"]
-            RAG["pgvector<br/>Semantic search + RAG"]
-            MCP["External risk MCP<br/>Read-only tools"]
-        end
+![Operations console showing an offline supply-risk answer and completed execution map](docs/images/operations-console.png)
 
-        SPECIALISTS -->|"Use scoped tools"| SOURCES
-    end
+**The evidence behind the answer, with tool results and source references.**
 
-    SUPERVISOR <-->|"Delegate or request follow-up<br/>Structured reports return"| SPECIALISTS
-    SUPERVISOR -->|"Evidence sufficient"| ANSWER["Compose cited operational answer"]
+![Dark-mode console showing tool evidence and grouped citations](docs/images/evidence-and-citations.png)
 
-    %% Preserve top-to-bottom placement without implying a source-to-answer data path.
-    SOURCES ~~~ ANSWER
+These screenshots show the built-in offline scenario, not a live LLM run. It reads the synthetic
+data without an API key. Live chat uses the same interface with model-driven routing and answers.
 
-    SUPERVISOR -. "execution events" .-> TRACE["Live observability<br/>Map, timeline, evidence"]
-    SPECIALISTS -. "agent and tool events" .-> TRACE
+## How It Works
 
-    classDef supervisorNode stroke-width:3px,font-size:18px,font-weight:700;
-    class SUPERVISOR supervisorNode;
-```
+![Architecture overview: one supervisor, four specialists, scoped evidence sources, and a cited answer](docs/images/architecture-overview.svg)
 
-This is the interview-level view. [Open the detailed implementation map](ARCHITECTURE.md) for
-the complete request flow, trust boundaries, service relationships, and files owned by each
-architectural segment.
+There is **one supervisor**, not a separate reviewer agent. Specialists return their findings to it.
+It can ask for more evidence before writing the answer. Turn, time, and usage limits bound the run.
 
-The supervisor calls specialists as tools using the OpenAI Agents SDK. Each structured specialist
-report returns to the same supervisor, which either requests focused follow-up evidence or returns
-the final `OperationsAnswer`. There is no separate post-processing LLM. The loop is bounded at 14
-supervisor turns, and every specialist invocation is bounded at 6 turns. Specialists can call only
-their own typed tools. A local `AgentRuntime` carries the authenticated access context, database
-session, fixed as-of date, retriever, and tool-event trace. That context is not a model-editable
-argument.
+| Part | What it does |
+|---|---|
+| Web console | Sends questions to FastAPI over HTTP and receives live trace events through Server-Sent Events (SSE). |
+| Supervisor and specialists | Use the OpenAI Agents SDK. Delegation happens inside the Python app; model calls go to OpenAI over HTTPS. |
+| Database tools | Read authorized shipment, inventory, and supplier data through SQLAlchemy. The model does not write SQL. |
+| Document retrieval | Combines keyword and semantic search over contract/report chunks stored in the database. Retrieved passages provide evidence for RAG. |
+| External-risk MCP server | Runs separately and exposes read-only synthetic disruption tools over MCP Streamable HTTP. It does not access the internal database. |
 
-MCP has one specific job: shipment, supplier-risk, and compliance specialists use it to read
-synthetic external disruption intelligence. Internal shipments, inventory, authorization, and
-contracts remain in the Control Tower database. The MCP service is a separate process and does
-not receive tenant IDs or database credentials.
+The live trace shows the map, event timeline, and evidence. Selecting an agent shows its delegated
+task and returned report, not hidden model reasoning.
 
-## Implemented Capabilities
+[Detailed architecture and file map](ARCHITECTURE.md) · [Technical reference](docs/REFERENCE.md)
 
-- OpenAI Agents SDK supervisor with four specialist agents
-- Bounded supervisor evidence-review loop with explicit stop-or-delegate decisions
-- Server-controlled per-agent model assignments with a shared specialist fallback
-- Pydantic structured outputs for specialist reports and final answers
-- Deterministic organization, warehouse, supplier, and conversation authorization
-- Typed SQLAlchemy tools instead of unrestricted model-generated SQL
-- PostgreSQL schema with a native `VECTOR(384)` document embedding column
-- Alembic schema migrations shared by SQLite and PostgreSQL
-- OpenAI embedding indexing with configurable model and dimensions
-- Scoped hybrid retrieval using vector similarity and keyword ranking
-- Standalone Streamable HTTP MCP server with five structured, read-only risk tools
-- Per-specialist MCP tool allowlists, health reporting, and graceful local fallback
-- Source-aware evidence traces for PostgreSQL, pgvector retrieval, and MCP calls
-- Live SSE execution observability with a runtime map, timeline, and exchange inspector
-- SQLite vector-search fallback for development and tests
-- Persistent conversations and message history
-- FastAPI chat, persona, conversation, health, and deterministic-demo endpoints
-- Responsive operations console with specialist activity and citations
-- Full Docker Compose stack and three-gate GitHub Actions CI pipeline
-- Seven golden LLM evaluation cases, including an MCP evidence case
-- Deterministic local demo that remains available without an API key
+## Run It Locally
 
-## Quick Start
+### Option 1: Docker
 
-The shortest path to the production-style stack requires Docker Desktop:
+Start Docker Desktop, then run:
 
 ```powershell
 git clone https://github.com/shshakib/Supply-Chain-AI-Control-Tower.git
@@ -102,317 +58,185 @@ cd Supply-Chain-AI-Control-Tower
 docker compose up --build
 ```
 
-This starts PostgreSQL/pgvector, applies Alembic migrations, seeds the database if it is empty,
-starts the external-risk MCP service, and starts the web application. Open
-`http://127.0.0.1:8000`. The offline scenario works without an API key.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) and click **Run offline scenario**.
+No API key is needed for this first run.
 
-For the lightweight SQLite development path:
+Compose starts PostgreSQL with pgvector, applies migrations, seeds an empty database, and starts
+the MCP server and web app. The default local ports are web `8000`, MCP `8010`, and PostgreSQL `5433`.
+
+Stop it with `docker compose down`. Your database stays in a Docker volume.
+Adding `--volumes` deletes that data, so use it only for an intentional reset.
+
+### Option 2: Python And SQLite
+
+Use Python 3.11 or newer. From the cloned project folder, in PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-control-tower --database-url "sqlite:///./control_tower.db" seed
-control-tower-risk-mcp                  # terminal 1
-control-tower-web --database-url "sqlite:///./control_tower.db"  # terminal 2
+python -m control_tower.cli --database-url "sqlite:///./control_tower.db" seed --if-empty
 ```
 
-**Run offline scenario** uses the deterministic local workflow and
-works without an API key. Its Live Map shows access resolution, routing, specialist work, data
-sources, supervisor evidence review, and the final answer as they execute. LLM chat requires
-`OPENAI_API_KEY`; it uses the same trace and calls the MCP service when an external signal is
-relevant.
-
-## VS Code Tasks And Debugging
-
-Open the `Supply-Chain-AI-Control-Tower` folder itself as the VS Code workspace. The checked-in
-`.vscode` configuration selects `.venv`, enables pytest discovery, and provides:
-
-- `Ctrl+Shift+B`: run the SQLite web console and external-risk MCP service together
-- **Terminal > Run Task > Supply Chain AI Control Tower: Run Full Local Stack**: start the web
-  console and synthetic MCP risk feed together
-- **Terminal > Run Task > Supply Chain AI Control Tower: Run External Risk MCP**: run only the
-  Streamable HTTP MCP service
-- **Terminal > Run Task > Supply Chain AI Control Tower: Seed SQLite Demo**: create or refresh local demo data
-- **Terminal > Run Task > Supply Chain AI Control Tower: Run Offline Demo**: run the no-key workflow with a trace
-- **Terminal > Run Task > Supply Chain AI Control Tower: Ask LLM (SQLite, API Key)**: prompt for a question and
-  synthetic persona
-- **Terminal > Run Task > Supply Chain AI Control Tower: Verify**: run tests, linting, and formatting checks
-- **Terminal > Run Task > Supply Chain AI Control Tower: Prepare PostgreSQL Demo**: start the pgvector container
-  and seed PostgreSQL
-
-The Run and Debug panel includes a compound configuration for the web server and MCP service,
-plus individual configurations for the offline CLI demo and an LLM question. Tasks whose names
-include `API Key` require `OPENAI_API_KEY` in `.env`; PostgreSQL and Docker MCP tasks require
-Docker Desktop.
-
-## MCP In One Concrete Flow
-
-For the question "What may be worsening shipment `SS-CRITICAL-001`?":
-
-1. The shipment specialist reads the authorized shipment and tracking history from PostgreSQL.
-2. It learns that BlueArc Logistics recorded an exception at the Port of Vancouver.
-3. It calls `search_disruption_events` or `get_carrier_advisories` through MCP.
-4. The separate risk-feed service returns `external-risk:EXT-2026-001`, a synthetic Vancouver
-   terminal disruption.
-5. The specialist labels the event as correlated external evidence, not confirmed causation.
-6. The supervisor LLM combines that evidence with inventory and contract findings into the final
-   answer.
-
-MCP is the interoperability boundary, not another reasoning layer. The OpenAI Agents SDK client
-discovers and calls tools exposed by the independent MCP server over Streamable HTTP. If that
-service is offline, the agents continue with local SQL and RAG evidence and disclose the missing
-external signal.
-
-The implementation follows the official [OpenAI Agents SDK MCP integration guide](https://openai.github.io/openai-agents-python/mcp/)
-and uses the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk).
-
-## Live Execution Observability
-
-Both `/api/chat/stream` and `/api/demo/stream` return Server-Sent Events. The browser renders
-those events in three coordinated views:
-
-- **Map** lights up the deterministic access boundary, the single supervisor, specialists,
-  PostgreSQL, RAG retrieval, MCP, and the answer. Paired arrows between the supervisor and
-  specialists distinguish downward delegation from upward evidence return. A shared execution-stage
-  frame groups the specialists with their evidence sources, and a centered connector shows that tool
-  flow without implying a direct source-to-answer path. A single left-side route from the supervisor
-  lights only when it has enough evidence.
-- **Timeline** preserves the exact event order with source labels and measured durations.
-- **Evidence** shows the durable tool records and citations returned with the answer.
-
-The supervisor is the parent orchestration span, so it remains active while delegated specialists
-run and while it reviews their reports. Each review is a distinct model turn: it either emits a
-`more_evidence` decision and loops to a specialist, or emits `evidence_sufficient` while composing
-the final structured answer. The Agents SDK hard limit of 14 supervisor turns, plus the 6-turn
-limit on each specialist invocation, prevents an infinite agent loop. Its map label changes from
-planning to coordinating, reviewing evidence, and finalizing so the open span is not mistaken for
-one continuous model call. Review events in the timeline select the same supervisor map node rather
-than implying a second reviewer agent. Directional connectors show which stage is active or
-complete, and the light/dark theme preference is stored locally in the browser.
-
-Selecting a specialist map node opens a safe input/output exchange: the delegated supervisor task,
-the specialist's structured summary, cited evidence claims, limitations, and duration. Tool nodes
-show redacted arguments, result counts, source, and parent stage. The evidence view groups stable
-references into operational records, external MCP intelligence, and retrieved document passages.
-The trace deliberately excludes hidden model reasoning, system prompts, credentials, internal
-UUIDs, and raw unrestricted model output. The same event schema covers started, completed, failed,
-skipped, and informational states, so unavailable services and unused specialists are visible
-instead of silently omitted.
-
-## Enable LLM Chat And RAG
-
-Create `.env` from `.env.example` and set:
-
-```dotenv
-OPENAI_API_KEY=your_api_key
-CONTROL_TOWER_SUPERVISOR_MODEL=gpt-5.6-terra
-CONTROL_TOWER_SPECIALIST_MODEL=gpt-5.6-luna
-CONTROL_TOWER_SHIPMENT_MODEL=gpt-5.6-luna
-CONTROL_TOWER_INVENTORY_MODEL=gpt-5.6-luna
-CONTROL_TOWER_SUPPLIER_RISK_MODEL=gpt-5.6-luna
-CONTROL_TOWER_CONTRACTS_MODEL=gpt-5.6-terra
-CONTROL_TOWER_EMBEDDING_MODEL=text-embedding-3-small
-CONTROL_TOWER_EMBEDDING_DIMENSIONS=384
-CONTROL_TOWER_RISK_MCP_ENABLED=true
-CONTROL_TOWER_RISK_MCP_URL=http://127.0.0.1:8010/mcp
-```
-
-Model names are server configuration, so they can be changed to models available to the API
-project. The four per-agent variables are optional and fall back to
-`CONTROL_TOWER_SPECIALIST_MODEL` when blank or omitted. The example profile reserves the stronger
-orchestration model for the supervisor and contracts/compliance while using the lower-cost model
-for high-volume operational analysis. The effective assignment appears beneath each agent in the
-execution map and in `/api/health`; it cannot be changed by a browser request. See the official
-[OpenAI model guide](https://developers.openai.com/api/docs/models) for current model tradeoffs.
-Do not place an API key in the browser or commit `.env`.
-
-| Agent | Server setting | Example profile |
-|---|---|---|
-| Supervisor | `CONTROL_TOWER_SUPERVISOR_MODEL` | `gpt-5.6-terra` |
-| Shipment specialist | `CONTROL_TOWER_SHIPMENT_MODEL` | `gpt-5.6-luna` |
-| Inventory specialist | `CONTROL_TOWER_INVENTORY_MODEL` | `gpt-5.6-luna` |
-| Supplier-risk specialist | `CONTROL_TOWER_SUPPLIER_RISK_MODEL` | `gpt-5.6-luna` |
-| Contracts and compliance specialist | `CONTROL_TOWER_CONTRACTS_MODEL` | `gpt-5.6-terra` |
-
-Index the synthetic documents:
+Start the MCP service in one terminal:
 
 ```powershell
-control-tower --database-url "sqlite:///./control_tower.db" index-documents
+.\.venv\Scripts\python.exe -m control_tower.integrations.risk_mcp_server
 ```
 
-Then use the web console or ask from the CLI:
+Start the web app in a second terminal, from the same folder:
 
 ```powershell
-control-tower --database-url "sqlite:///./control_tower.db" ask `
-  "Which delayed shipments could stop production, and what contractual remedies apply?" `
-  --trace
+.\.venv\Scripts\python.exe -m control_tower.web --database-url "sqlite:///./control_tower.db"
 ```
 
-## PostgreSQL And pgvector
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). On macOS/Linux, activate the environment with
+`source .venv/bin/activate` and use `python` in place of the Windows executable path.
 
-The complete PostgreSQL stack is one command:
+**Which database should I use?** PostgreSQL/pgvector is the full-stack path. SQLite is the lightweight
+development and test option. Both store operational records, document chunks, embeddings, and
+conversations. SQLite ranks vectors in Python; PostgreSQL uses pgvector. You only need to seed the
+database you actually use.
+
+## Enable Live Chat
+
+Live questions and embedding indexing use paid OpenAI API calls. The offline scenario does not.
+
+1. Copy `.env.example` to `.env` and set `OPENAI_API_KEY`.
+2. Set the supervisor and specialist model names to models available to your API project.
+3. Restart the app so it picks up the configuration.
+4. Index the documents to enable semantic search.
+
+For Docker:
 
 ```powershell
-docker compose up --build
+docker compose up --detach --build
+docker compose exec web control-tower index-documents
 ```
 
-Compose exposes the UI on `8000`, MCP on `8010`, and PostgreSQL on `5433`. Published ports bind to
-`127.0.0.1` by default so the unauthenticated portfolio demo is not exposed to the local network.
-The `migrate` and `seed` services complete before the web service starts. Seeding is idempotent for
-an existing demo volume. In PostgreSQL, semantic ranking uses the pgvector cosine-distance operator.
-
-Stop the stack while retaining data with `docker compose down`. Use
-`docker compose down --volumes` only when you intentionally want a fresh synthetic database.
-
-## Database Migrations
-
-Alembic owns the persistent database schema. Apply all pending revisions with:
+For SQLite, with the virtual environment active:
 
 ```powershell
-control-tower migrate
+python -m control_tower.cli --database-url "sqlite:///./control_tower.db" index-documents
 ```
 
-`init-db` remains as a backwards-compatible alias. When a model changes, generate a revision with
-`alembic revision --autogenerate -m "describe the schema change"`, review the generated SQL, and
-apply it with `control-tower migrate`. Seeding inserts demo rows; it does not define tables.
+Keep `CONTROL_TOWER_EMBEDDING_DIMENSIONS=384` for PostgreSQL. If embeddings are unavailable,
+retrieval falls back to scoped keyword search and reports the limitation. Indexing rebuilds vectors
+when their stored model or dimensions no longer match the configuration.
 
-Databases created before migration support was introduced have no Alembic revision marker. Because
-the included data is synthetic, reset those once with `docker compose down --volumes` or delete the
-old local SQLite `.db` file, then seed again.
+Try this as **Noah Williams**:
 
-## Synthetic Dataset
+> Investigate shipment SS-CRITICAL-001. Could its delay stop production in Toronto?
+> Check inventory, Apex Circuits' supplier risk, external disruptions, and the contract's
+> late-delivery terms. Cite the evidence and suggest immediate actions.
 
-The fixed demo date is `2026-06-30`. The generator creates:
+The scenario uses a fixed date of **June 30, 2026**, not today's shipping conditions.
 
-| Entity | Count |
-|---|---:|
-| Synthetic users | 6 |
-| Warehouses | 4 |
-| Suppliers | 12 |
-| Products | 30 |
-| Purchase orders | 181 |
-| Shipments | 181 |
-| Inventory snapshots | 3,600 |
-| Documents | 14 |
-| External MCP risk events | 8 |
+### Model Settings
 
-The main correlated scenario includes:
+All model choices are server-controlled in `.env`. They cannot be changed through a chat question.
 
-- Toronto has 30 available `MCU-X100` units and 3.8 days of cover.
-- Shipment `SS-CRITICAL-001` contains 800 replacement units from Apex Circuits.
-- A port labor disruption delays the shipment by nine days.
-- An incident report describes the interruption and possible air-freight recovery.
-- The supplier agreement permits a 4% credit after a five-day grace period, subject to
-  force-majeure review.
-- The separate synthetic MCP feed reports a critical Vancouver terminal disruption, a BlueArc
-  capacity advisory, and an Apex capacity-watch signal with stable `external-risk:` references.
+| Setting | Applies to |
+|---|---|
+| `CONTROL_TOWER_SUPERVISOR_MODEL` | Supervisor |
+| `CONTROL_TOWER_SPECIALIST_MODEL` | Default for all specialists |
+| `CONTROL_TOWER_SHIPMENT_MODEL` | Optional shipment override |
+| `CONTROL_TOWER_INVENTORY_MODEL` | Optional inventory override |
+| `CONTROL_TOWER_SUPPLIER_RISK_MODEL` | Optional supplier-risk override |
+| `CONTROL_TOWER_CONTRACTS_MODEL` | Optional contracts override |
+| `CONTROL_TOWER_EMBEDDING_MODEL` | Document and search embeddings |
 
-## Deterministic Access
+Blank specialist overrides use the shared default. The execution map shows each agent's configured
+model. Keep API keys on the server and never commit `.env`.
 
-| Persona | Role | Warehouse scope |
-|---|---|---|
-| `ava.admin@controltower.demo` | Global administrator | All |
-| `noah.east@controltower.demo` | Regional operations | Toronto and Chicago |
-| `mia.west@controltower.demo` | Regional operations | Vancouver and Austin |
-| `priya.procurement@controltower.demo` | Procurement analyst | All |
-| `leo.quality@controltower.demo` | Quality analyst | All |
-| `sofia.viewer@controltower.demo` | Viewer | Toronto |
+## Access And Run Limits
 
-The access service resolves scope before the agent run. Tools inject organization and warehouse
-filters from local context. Document retrieval applies the same warehouse and supplier scope
-before keyword or vector ranking. Conversation reads are also restricted to their owning user.
+The app resolves access in Python before calling an agent. Database and retrieval tools apply
+that scope; the LLM cannot grant itself access. For example, Noah can see Toronto and Chicago,
+while Mia can see Vancouver and Austin.
 
-## Agent Responsibilities
+**The persona picker is a demo feature, not a login system.** This project is for local or private
+use until real authentication is added.
 
-| Agent | Local tools | External MCP tools |
-|---|---|---|
-| Shipment specialist | Delayed inbound shipments, tracking history | Disruptions, lanes, carriers |
-| Inventory specialist | Current low stock, inventory history | None |
-| Supplier-risk specialist | Risk ranking, scorecards, quality incidents | Supplier watch signals |
-| Contracts and compliance specialist | Scoped hybrid contract/report retrieval | Trade advisories |
-| Supervisor | The four specialists only | None |
+Default live-run limits are 180 seconds, 24 model calls, and 60,000 reported tokens shared across
+all agents, with a 3,000-output-token limit per call. The supervisor also has a 14-turn limit,
+and each specialist invocation has a 6-turn limit.
 
-The LLM chooses specialists and tool arguments. Authorization, joins, aggregation, risk-score
-calculation, date limits, and SQL construction remain deterministic Python code.
+An optional estimated dollar cutoff can be configured with your own model rates. It is disabled
+by default. In-flight calls can exceed a threshold, and embedding costs are separate, so this is
+not a guaranteed billing cap. See [run-limit details](docs/REFERENCE.md#run-limits).
 
-## Evaluation
+Final citations must match references actually returned by tools. That checks where a reference
+came from, not whether every conclusion is correct.
 
-The golden cases cover cross-domain routing, contract retrieval, supplier ranking, inventory
-scope, shipment tracking, regional isolation, and MCP evidence usage:
+## Tests And CI
+
+With the Python development dependencies installed:
 
 ```powershell
-control-tower --database-url "sqlite:///./control_tower.db" evaluate
+python -m pytest -m "not integration"
+python -m ruff check src tests scripts
+python -m ruff format --check src tests scripts
 ```
 
-This command requires an API key. It checks expected specialists, evidence terms, forbidden
-internal identifiers, and access-leakage indicators.
+GitHub Actions runs three checks on pull requests and pushes to `main`:
 
-## Verification
+1. Unit tests, linting, formatting, and a SQLite smoke test.
+2. Live PostgreSQL/pgvector and MCP integration tests.
+3. A full Docker startup and offline question-to-answer smoke test.
+
+These checks do not need an OpenAI API key. Seven live-model evaluation cases are also included.
+To run one against the Docker stack (this uses paid API calls):
 
 ```powershell
-python -m pytest
-python -m ruff check src tests
-python -m ruff format --check src tests
+docker compose exec web control-tower evaluate --limit 1
 ```
 
-## Continuous Integration
+Remove `--limit 1` to run all cases. Evaluations check routing, evidence, citation provenance,
+and access-isolation indicators; they are not a guarantee of answer quality.
 
-`.github/workflows/ci.yml` runs on every pull request and push to `main` without an OpenAI key:
+Image publishing is **manual opt-in**: the CI workflow can publish the exact tested image to GitHub
+Container Registry (GHCR). Normal pushes do not publish or deploy it.
+[Deployment, integration checks, and backup instructions](docs/DEPLOYMENT.md)
 
-1. **Python quality:** Ruff, formatting, unit tests, and a SQLite lifecycle smoke test.
-2. **Live integrations:** Alembic and synthetic seeding against PostgreSQL/pgvector, plus a real
-   Streamable HTTP connection to the MCP server.
-3. **Container stack:** Builds the image, starts the complete Compose topology, verifies both
-   health endpoints, and removes the test volume.
+## Useful Files
 
-The workflow builds but does not publish an image. An image registry and deployment workflow can
-be added later when a hosting platform is selected. After the first successful push, repository
-branch protection can require the three CI jobs before changes are merged into `main`.
+| Path | Purpose |
+|---|---|
+| `src/control_tower/agents/llm.py` | Supervisor, four specialists, and their tools |
+| `src/control_tower/agent_service.py` | Runs agents and validates their output |
+| `src/control_tower/access.py` | Deterministic access rules |
+| `src/control_tower/retrieval.py` and `embeddings.py` | Document search and indexing |
+| `src/control_tower/integrations/` | MCP client, server, and synthetic risk feed |
+| `src/control_tower/limits.py` | Shared per-question budgets |
+| `src/control_tower/web.py` and `static/` | API and web interface |
+| `src/control_tower/migrations/` | Alembic database migrations |
+| `src/control_tower/synthetic.py` | Repeatable demo-data generator |
+| `tests/` | Automated tests |
+| `.vscode/` | Run tasks and debugger configurations |
 
-## Project Layout
+In VS Code, open the repository folder, install the Python dependencies above, then use
+**Terminal > Run Task**. `Ctrl+Shift+B` starts the SQLite web app and MCP service together.
+[Task list, dataset, personas, and implementation notes](docs/REFERENCE.md)
 
-```text
-src/control_tower/
-  access.py             deterministic authorization
-  agent_service.py      OpenAI runner boundary
-  agents/
-    llm.py              supervisor, specialists, and function tools
-    runtime.py          trusted local run context and tool trace
-    supervisor.py       deterministic offline demonstration
-  analytics.py          supplier, shipment, and inventory analytics
-  conversations.py      scoped conversation persistence
-  embeddings.py         OpenAI embedding provider and indexer
-  integrations/
-    risk_feed.py        deterministic synthetic external-risk dataset
-    risk_mcp_server.py  standalone Streamable HTTP MCP server
-    risk_mcp_client.py  Agents SDK connection, filtering, and fallback
-  migrations/           Alembic environment and versioned schema revisions
-  retrieval.py          scoped hybrid retrieval
-  models.py             relational, vector, and conversation schema
-  schema.py             programmatic migration commands
-  observability.py      typed, redacted execution events and timing
-  synthetic.py          correlated synthetic-data generator
-  tools.py              core typed database tools
-  web.py                FastAPI application
-  static/               responsive operations console
-evals/cases.json         golden LLM evaluation cases
-tests/                   authorization, tools, RAG, MCP, agents, API, and UI backend tests
-.github/workflows/ci.yml pull-request and main-branch CI pipeline
-compose.yaml             complete PostgreSQL, migration, seed, MCP, and web stack
-Dockerfile               shared web and MCP application image
-.vscode/                 repeatable run, test, Docker, and debugger workflows
-```
+## Common Setup Issues
 
-## Production Hardening
+- **Command or module not found:** activate `.venv` and run `python -m pip install -e ".[dev]"`
+  from the project root. The Python package is named `control_tower`.
+- **Port 8000 already in use:** stop the previous server or use `--port 8001` with the Python web
+  command. For Docker, set `CONTROL_TOWER_WEB_PORT=8001` in `.env`.
+- **An existing database needs upgrading:** Docker applies migrations on startup. For SQLite,
+  run `python -m control_tower.cli --database-url "sqlite:///./control_tower.db" migrate`.
+  Re-run indexing after embedding model changes; it uses paid API calls.
+- **MCP is offline:** start the risk service. Live agents can continue with local evidence,
+  but external disruption information will be unavailable.
 
-This is a complete portfolio implementation, not a production deployment. A production version
-should add PostgreSQL row-level security, managed secrets, rate limiting, background embedding
-jobs, durable trace storage, model-cost monitoring, stronger identity authentication, and a
-hosting-specific continuous deployment workflow.
-The checked-in PostgreSQL username and password are disposable local-demo credentials, and Compose
-binds all published ports to loopback by default. Replace the credentials and put authenticated
-services behind TLS before using the stack on a shared host.
-An internet-facing MCP deployment should additionally use OAuth or signed service credentials,
-strict origin and host policies, network timeouts, circuit breakers, and separate least-privilege
-ownership of the external feed.
+## What Is Still Missing?
+
+The main local workflow is implemented. Public hosting still needs real authentication, per-user
+rate/concurrency limits, account-wide spending protection, HTTPS, managed secrets, and private
+database/MCP networking. Backups need a tested restore procedure, and operational alerts need to
+be configured. Live-model evaluations should be run against the chosen model profile before release.
+
+The checked-in database credentials are disposable local-demo values. Do not expose this stack
+unchanged to the internet. See the [deployment checklist](docs/DEPLOYMENT.md) for the remaining work.

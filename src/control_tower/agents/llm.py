@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict
 from typing import Any, Literal
 
@@ -37,8 +38,11 @@ class OperationsAnswer(BaseModel):
     caveats: list[str] = Field(default_factory=list)
 
 
-def _json_records(records: list[object]) -> str:
-    return json.dumps([asdict(record) for record in records], default=str)
+def _json_records(records: list[object], *, reference: Callable[[Any], str]) -> str:
+    return json.dumps(
+        [{**asdict(record), "reference": reference(record)} for record in records],
+        default=str,
+    )
 
 
 @function_tool
@@ -97,7 +101,9 @@ def get_shipment_tracking_history(
         arguments={"tracking_number": tracking_number},
         result_count=len(records),
     )
-    return _json_records(records)
+    return _json_records(
+        records, reference=lambda row: f"tracking:{row.tracking_number}:{row.occurred_at}"
+    )
 
 
 @function_tool
@@ -161,7 +167,10 @@ def get_inventory_history(
         arguments={"warehouse_code": warehouse_code, "sku": sku, "days": days},
         result_count=len(records),
     )
-    return _json_records(records)
+    return _json_records(
+        records,
+        reference=lambda row: f"inventory:{row.warehouse_code}/{row.sku}/{row.snapshot_date}",
+    )
 
 
 @function_tool
@@ -182,7 +191,7 @@ def rank_supplier_risk(
         arguments={"limit": limit},
         result_count=len(records),
     )
-    return _json_records(records)
+    return _json_records(records, reference=lambda row: f"supplier:{row.supplier_code}")
 
 
 @function_tool
@@ -235,11 +244,13 @@ def list_quality_incidents(
         arguments={"supplier_code": supplier_code, "status": status, "limit": limit},
         result_count=len(records),
     )
-    return _json_records(records)
+    return _json_records(
+        records, reference=lambda row: f"incident:{row.supplier_code}/{row.sku}/{row.reported_on}"
+    )
 
 
 @function_tool
-def search_contracts_and_reports(
+async def search_contracts_and_reports(
     ctx: RunContextWrapper[AgentRuntime],
     query: str,
     supplier_code: str | None = None,
@@ -248,12 +259,13 @@ def search_contracts_and_reports(
 ) -> str:
     """Run scoped hybrid semantic and keyword search over contracts and reports.
 
-    Returns JSON chunks with citation, title, document_type, heading, content,
-    relevance score, and retrieval method. Never invent a clause absent from results.
+    Returns JSON with chunks (citations, content, scores, retrieval methods) and
+    limitations. Disclose retrieval limitations even when no chunks are returned.
+    Never invent a clause absent from results.
     """
     runtime = ctx.context
     supplier_id = runtime.resolver.supplier_id(supplier_code) if supplier_code else None
-    records = runtime.retriever.search(
+    records = await runtime.retriever.asearch(
         runtime.access,
         query=query,
         limit=limit,
@@ -272,7 +284,23 @@ def search_contracts_and_reports(
         result_count=len(records),
         source="pgvector",
     )
-    return _json_records(records)
+    limitations = [runtime.retriever.last_warning] if runtime.retriever.last_warning else []
+    if limitations and runtime.trace is not None:
+        runtime.trace.info(
+            event_type="retrieval",
+            node="pgvector",
+            label="Keyword-only retrieval",
+            source="pgvector",
+            details={"limitations": limitations, "result_count": len(records)},
+        )
+    return json.dumps(
+        {
+            "chunks": [asdict(record) for record in records],
+            "count": len(records),
+            "limitations": limitations,
+        },
+        default=str,
+    )
 
 
 SPECIALIST_RULES = """
@@ -349,6 +377,9 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
         node = AGENT_NODES.get(agent.name)
         if runtime is None or runtime.trace is None or node is None:
             return
+        if node == "supervisor":
+            # AgentService closes this span only after validating the returned answer.
+            return
         runtime.trace.complete(
             node=node,
             label=f"{AGENT_LABELS[node]} completed",
@@ -365,11 +396,14 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
         _input_items: list[Any],
     ) -> None:
         runtime = _agent_runtime(context)
+        if runtime is not None and runtime.budget is not None:
+            runtime.budget.before_model()
         if (
             runtime is None
             or runtime.trace is None
             or AGENT_NODES.get(agent.name) != "supervisor"
             or not runtime.trace.completed_specialists
+            or runtime.trace.is_active("review")
         ):
             return
         runtime.trace.start(
@@ -391,6 +425,8 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
         response: object,
     ) -> None:
         runtime = _agent_runtime(context)
+        if runtime is not None and runtime.budget is not None:
+            runtime.budget.after_model(getattr(response, "usage", None))
         if (
             runtime is None
             or runtime.trace is None
@@ -409,12 +445,14 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
                 },
             )
             return
-        runtime.trace.complete(
+        runtime.trace.info(
+            event_type="review",
             node="review",
-            label="Evidence sufficient; final answer composed",
+            label="Awaiting final answer validation",
+            parent_node="supervisor",
+            source="application",
             details={
-                "decision": "evidence_sufficient",
-                "specialists": sorted(runtime.trace.completed_specialists),
+                "decision": "pending_validation",
             },
         )
 
@@ -425,6 +463,8 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
         tool: Any,
     ) -> None:
         runtime = _agent_runtime(context)
+        if runtime is not None and runtime.budget is not None:
+            runtime.budget.check()
         if runtime is None or runtime.trace is None:
             return
         tool_name = getattr(tool, "name", "")
@@ -475,6 +515,8 @@ class MCPTraceHooks(AgentHooks[AgentRuntime]):
         runtime = _agent_runtime(context)
         if not isinstance(runtime, AgentRuntime):
             return
+        if _trace_tool(tool_name) is not None:
+            runtime.observed_references.update(_tool_references(result))
         result_count = _mcp_result_count(result)
         if matched_name is not None:
             runtime.record(
@@ -584,6 +626,27 @@ def _delegated_task(arguments: dict[str, Any]) -> str:
     return "Specialist task was not available in the public trace."
 
 
+def _tool_references(payload: object) -> set[str]:
+    if isinstance(payload, str):
+        try:
+            return _tool_references(json.loads(payload))
+        except json.JSONDecodeError:
+            return set()
+    if isinstance(payload, dict):
+        references = {
+            value
+            for key, value in payload.items()
+            if key in {"reference", "citation"} and isinstance(value, str)
+        }
+        for key, value in payload.items():
+            if isinstance(value, dict | list) or key == "text":
+                references.update(_tool_references(value))
+        return references
+    if isinstance(payload, list):
+        return set().union(*(_tool_references(item) for item in payload))
+    return set()
+
+
 def _mcp_result_count(result: object) -> int:
     payload: object = result
     if isinstance(result, str):
@@ -609,7 +672,11 @@ def build_agent_system(
     *,
     risk_mcp_server: Any | None = None,
 ) -> Agent[AgentRuntime]:
-    specialist_settings = ModelSettings(reasoning={"effort": "low"}, verbosity="low")
+    specialist_settings = ModelSettings(
+        reasoning={"effort": "low"},
+        verbosity="low",
+        max_tokens=settings.run_limits.max_output_tokens,
+    )
     risk_servers = [risk_mcp_server] if risk_mcp_server is not None else []
     trace_hooks = MCPTraceHooks()
     mcp_config = {
@@ -733,6 +800,7 @@ def build_agent_system(
             reasoning={"effort": "low"},
             verbosity="medium",
             parallel_tool_calls=True,
+            max_tokens=settings.run_limits.max_output_tokens,
         ),
         output_type=OperationsAnswer,
     )

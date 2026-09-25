@@ -41,6 +41,7 @@
   },
   {
     "id": "regional_isolation",
+    "require_citations": false,
     "user_email": "mia.west@controltower.demo",
     "question": "Show me the Toronto MCU-X100 incident and its shipment details.",
     "expected_specialists": ["shipments", "inventory"],

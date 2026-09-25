@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="690" viewBox="0 0 920 690" role="img" aria-labelledby="title description">
+  <title id="title">Supply Chain AI Control Tower overview</title>
+  <desc id="description">A question passes through deterministic access control to one supervisor. The supervisor exchanges tasks and evidence with four specialists. Specialists query database records, documents, and an external MCP feed. The supervisor writes the final cited answer. Follow-up work is bounded by run limits.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse">
+      <path d="M1 1 L7 4 L1 7" fill="none" stroke="#54717a" stroke-width="1.5"/>
+    </marker>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #20333a; font-size: 15px; }
+      .heading { font-weight: 700; }
+      .small { font-size: 13px; fill: #52666e; }
+      .box { fill: #ffffff; stroke: #afbec3; }
+      .group { fill: #f3f7f8; stroke: #b8c9ce; }
+      .flow { fill: none; stroke: #54717a; stroke-width: 1.6; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="920" height="690" rx="8" fill="#ffffff"/>
+
+  <rect class="box" x="350" y="20" width="360" height="46" rx="5"/>
+  <text class="heading" x="530" y="49" text-anchor="middle">Your question</text>
+  <path class="flow" d="M530 66 V93"/>
+  <rect class="box" x="350" y="94" width="360" height="46" rx="5"/>
+  <text x="530" y="123" text-anchor="middle">Deterministic access check</text>
+  <path class="flow" d="M530 140 V168"/>
+
+  <rect x="335" y="170" width="390" height="70" rx="5" fill="#e9f6f3" stroke="#087f78" stroke-width="2"/>
+  <text class="heading" x="530" y="200" text-anchor="middle" style="font-size:20px">Supervisor agent</text>
+  <text x="530" y="223" text-anchor="middle">Plan, review evidence, write the answer</text>
+
+  <path class="flow" d="M502 240 V301"/>
+  <path class="flow" d="M558 301 V242"/>
+  <text class="small" x="485" y="272" text-anchor="end">Tasks / follow-ups</text>
+  <text class="small" x="577" y="272">Evidence reports</text>
+
+  <rect class="group" x="195" y="303" width="670" height="116" rx="5"/>
+  <text class="heading" x="530" y="330" text-anchor="middle">Four specialist agents</text>
+  <rect class="box" x="215" y="346" width="145" height="49" rx="4"/>
+  <text x="287" y="376" text-anchor="middle">Shipments</text>
+  <rect class="box" x="376" y="346" width="145" height="49" rx="4"/>
+  <text x="448" y="376" text-anchor="middle">Inventory</text>
+  <rect class="box" x="537" y="346" width="145" height="49" rx="4"/>
+  <text x="609" y="376" text-anchor="middle">Supplier risk</text>
+  <rect class="box" x="698" y="346" width="145" height="49" rx="4"/>
+  <text x="770" y="376" text-anchor="middle">Contracts</text>
+
+  <path class="flow" d="M502 419 V473"/>
+  <path class="flow" d="M558 473 V421"/>
+  <text class="small" x="485" y="450" text-anchor="end">Scoped tool calls</text>
+  <text class="small" x="577" y="450">Results</text>
+
+  <rect class="group" x="195" y="475" width="670" height="107" rx="5"/>
+  <text class="heading" x="530" y="501" text-anchor="middle">Evidence sources</text>
+  <rect class="box" x="215" y="514" width="199" height="48" rx="4"/>
+  <text x="314" y="534" text-anchor="middle">PostgreSQL</text>
+  <text class="small" x="314" y="551" text-anchor="middle">Operational records</text>
+  <rect class="box" x="431" y="514" width="199" height="48" rx="4"/>
+  <text x="530" y="534" text-anchor="middle">Document search / RAG</text>
+  <text class="small" x="530" y="551" text-anchor="middle">Keywords + pgvector</text>
+  <rect class="box" x="647" y="514" width="199" height="48" rx="4"/>
+  <text x="746" y="534" text-anchor="middle">External risk MCP</text>
+  <text class="small" x="746" y="551" text-anchor="middle">Read-only disruption feed</text>
+
+  <path class="flow" d="M335 205 H105 V634 H334"/>
+  <text class="small" x="92" y="590" text-anchor="end">Enough</text>
+  <text class="small" x="92" y="608" text-anchor="end">evidence</text>
+  <rect x="335" y="610" width="390" height="48" rx="5" fill="#e9f6f3" stroke="#087f78"/>
+  <text class="heading" x="530" y="640" text-anchor="middle">Answer with citations and limitations</text>
+  <text class="small" x="530" y="681" text-anchor="middle">Follow-up work stays within turn, time, and usage limits.</text>
+</svg>

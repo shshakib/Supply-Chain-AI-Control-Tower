@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+from control_tower.limits import RunLimits
 
 DEFAULT_DATABASE_URL = (
     "postgresql+psycopg://control_tower:control_tower@localhost:5433/control_tower"
@@ -30,6 +32,7 @@ class Settings:
     risk_mcp_connect_timeout_seconds: float
     host: str
     port: int
+    run_limits: RunLimits = field(default_factory=RunLimits)
 
     @property
     def openai_configured(self) -> bool:
@@ -92,6 +95,7 @@ def get_settings() -> Settings:
         ),
         host=os.getenv("CONTROL_TOWER_HOST", "127.0.0.1"),
         port=int(os.getenv("CONTROL_TOWER_PORT", "8000")),
+        run_limits=RunLimits.from_env(),
     )
 
 

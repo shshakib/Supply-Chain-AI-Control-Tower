@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from control_tower.access import AccessContext
-from control_tower.embeddings import EmbeddingProvider
+from control_tower.embeddings import EmbeddingProvider, validate_embedding_config, validate_vectors
 from control_tower.models import Document, DocumentChunk
 
 
@@ -31,6 +31,7 @@ class HybridDocumentRetriever:
     def __init__(self, session: Session, embedding_provider: EmbeddingProvider | None) -> None:
         self.session = session
         self.embedding_provider = embedding_provider
+        self.last_warning: str | None = None
 
     def search(
         self,
@@ -40,7 +41,9 @@ class HybridDocumentRetriever:
         limit: int = 6,
         supplier_id: uuid.UUID | None = None,
         document_type: str | None = None,
+        _query_vectors: list[list[float]] | None = None,
     ) -> list[RetrievedChunk]:
+        self.last_warning = None
         if not query.strip():
             raise ValueError("query cannot be empty")
         if not 1 <= limit <= 20:
@@ -62,6 +65,7 @@ class HybridDocumentRetriever:
             limit=candidate_limit,
             supplier_id=supplier_id,
             document_type=document_type,
+            query_vectors=_query_vectors,
         )
         if not semantic:
             return keyword[:limit]
@@ -81,6 +85,37 @@ class HybridDocumentRetriever:
             )
             for chunk_id in ranked[:limit]
         ]
+
+    async def asearch(
+        self,
+        access: AccessContext,
+        *,
+        query: str,
+        limit: int = 6,
+        supplier_id: uuid.UUID | None = None,
+        document_type: str | None = None,
+    ) -> list[RetrievedChunk]:
+        # Validate scope and obtain fallback before making any external request.
+        fallback = HybridDocumentRetriever(self.session, None)
+        kwargs = dict(
+            query=query, limit=limit, supplier_id=supplier_id, document_type=document_type
+        )
+        keyword = fallback.search(access, **kwargs)
+        self.last_warning = None
+        conditions = self._semantic_conditions(
+            access, supplier_id=supplier_id, document_type=document_type
+        )
+        if conditions is None:
+            return keyword
+        try:
+            vectors = await self.embedding_provider.aembed([query])
+        except Exception:
+            self.last_warning = (
+                "Semantic search is temporarily unavailable; results use keyword search only. "
+                "Relevant documents may be missing."
+            )
+            return keyword
+        return self.search(access, **kwargs, _query_vectors=vectors)
 
     def _scope_conditions(
         self,
@@ -182,6 +217,44 @@ class HybridDocumentRetriever:
         scored.sort(key=lambda item: item.score, reverse=True)
         return scored[:limit]
 
+    def _semantic_conditions(
+        self,
+        access: AccessContext,
+        *,
+        supplier_id: uuid.UUID | None,
+        document_type: str | None,
+    ) -> list | None:
+        if self.embedding_provider is None:
+            self.last_warning = "Semantic search is disabled; results use keyword search only."
+            return None
+        try:
+            validate_embedding_config(self.session, self.embedding_provider)
+        except ValueError:
+            self.last_warning = (
+                "Embedding configuration is incompatible with the database; "
+                "results use keyword search only."
+            )
+            return None
+        conditions = self._scope_conditions(
+            access,
+            supplier_id=supplier_id,
+            document_type=document_type,
+        )
+        conditions.append(DocumentChunk.embedding.is_not(None))
+        conditions.extend(
+            [
+                DocumentChunk.embedding_model == self.embedding_provider.model,
+                DocumentChunk.embedding_dimensions == self.embedding_provider.dimensions,
+            ]
+        )
+        if self.session.execute(self._base_select().where(*conditions).limit(1)).first() is None:
+            self.last_warning = (
+                "No compatible document embeddings in the authorized scope; "
+                "results use keyword search only. Run index-documents to rebuild the index."
+            )
+            return None
+        return conditions
+
     def _semantic_search(
         self,
         access: AccessContext,
@@ -190,16 +263,31 @@ class HybridDocumentRetriever:
         limit: int,
         supplier_id: uuid.UUID | None,
         document_type: str | None,
+        query_vectors: list[list[float]] | None = None,
     ) -> list[RetrievedChunk]:
-        if self.embedding_provider is None:
-            return []
-        query_vector = self.embedding_provider.embed([query])[0]
-        conditions = self._scope_conditions(
-            access,
-            supplier_id=supplier_id,
-            document_type=document_type,
+        conditions = self._semantic_conditions(
+            access, supplier_id=supplier_id, document_type=document_type
         )
-        conditions.append(DocumentChunk.embedding.is_not(None))
+        if conditions is None:
+            return []
+
+        # Only provider/config failures degrade gracefully; database and access errors still fail.
+        try:
+            vectors = (
+                query_vectors
+                if query_vectors is not None
+                else self.embedding_provider.embed([query])
+            )
+            validate_vectors(vectors, count=1, dimensions=self.embedding_provider.dimensions)
+            query_vector = vectors[0]
+            if not any(query_vector):
+                raise ValueError("Query embedding has zero magnitude.")
+        except Exception:
+            self.last_warning = (
+                "Semantic search is temporarily unavailable; results use keyword search only. "
+                "Relevant documents may be missing."
+            )
+            return []
 
         if self.session.bind is not None and self.session.bind.dialect.name == "postgresql":
             distance = DocumentChunk.embedding.cosine_distance(query_vector)

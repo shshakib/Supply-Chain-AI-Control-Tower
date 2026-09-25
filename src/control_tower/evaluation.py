@@ -12,7 +12,7 @@ from control_tower.config import Settings
 from control_tower.database import session_scope
 from control_tower.synthetic import DEMO_AS_OF
 
-DEFAULT_CASES_PATH = Path(__file__).resolve().parents[2] / "evals" / "cases.json"
+DEFAULT_CASES_PATH = Path(__file__).resolve().parent / "evals" / "cases.json"
 
 
 class EvaluationCase(BaseModel):
@@ -23,6 +23,7 @@ class EvaluationCase(BaseModel):
     expected_terms: list[str] = Field(default_factory=list)
     expected_evidence_sources: list[str] = Field(default_factory=list)
     forbidden_terms: list[str] = Field(default_factory=list)
+    require_citations: bool = True
 
 
 def load_cases(path: Path = DEFAULT_CASES_PATH) -> list[EvaluationCase]:
@@ -38,30 +39,45 @@ async def run_evaluations(
 ) -> dict:
     cases = load_cases(cases_path)
     if limit is not None:
+        if limit < 1:
+            raise ValueError("Evaluation limit must be positive.")
         cases = cases[:limit]
+    if not cases:
+        raise ValueError("An evaluation must contain at least one case.")
     service = AgentService(settings)
     results = []
 
     async with service:
         for case in cases:
-            with session_scope(engine) as session:
-                access = AccessService(session).resolve(case.user_email, "meridian-assembly")
-                response = await service.ask(
-                    session,
-                    access,
-                    question=case.question,
-                    as_of=DEMO_AS_OF,
-                )
+            try:
+                with session_scope(engine) as session:
+                    access = AccessService(session).resolve(case.user_email, "meridian-assembly")
+                    response = await service.ask(
+                        session,
+                        access,
+                        question=case.question,
+                        as_of=DEMO_AS_OF,
+                    )
+            except Exception as exc:
+                results.append({"id": case.id, "passed": False, "error": type(exc).__name__})
+                continue
 
             output = response.output
             searchable = " ".join([output.answer, *output.key_findings, *output.citations]).lower()
-            actual_specialists = set(output.specialists_used)
+            actual_specialists = {event.specialist for event in response.tool_events}
             specialist_pass = set(case.expected_specialists).issubset(actual_specialists)
             terms_pass = all(term.lower() in searchable for term in case.expected_terms)
             forbidden_pass = all(term.lower() not in searchable for term in case.forbidden_terms)
-            actual_sources = {event.source for event in response.tool_events}
+            actual_sources = {
+                event.source for event in response.tool_events if event.result_count > 0
+            }
             evidence_source_pass = set(case.expected_evidence_sources).issubset(actual_sources)
-            passed = specialist_pass and terms_pass and forbidden_pass and evidence_source_pass
+            citation_pass = (bool(output.citations) or not case.require_citations) and set(
+                output.citations
+            ).issubset(response.observed_references)
+            passed = all(
+                (specialist_pass, terms_pass, forbidden_pass, evidence_source_pass, citation_pass)
+            )
             results.append(
                 {
                     "id": case.id,
@@ -70,8 +86,10 @@ async def run_evaluations(
                     "terms_pass": terms_pass,
                     "forbidden_pass": forbidden_pass,
                     "evidence_source_pass": evidence_source_pass,
+                    "citation_pass": citation_pass,
                     "actual_evidence_sources": sorted(actual_sources),
-                    "actual_specialists": output.specialists_used,
+                    "actual_specialists": sorted(actual_specialists),
+                    "usage": response.usage,
                     "citations": output.citations,
                     "answer": output.answer,
                 }

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from dataclasses import asdict, dataclass, field
 from datetime import date
 
-from agents import Runner
-from pydantic import ValidationError
+from agents import RunConfig, Runner
+from agents.models.openai_provider import OpenAIProvider
+from openai import AsyncOpenAI
 from sqlalchemy.orm import Session
 
 from control_tower.access import AccessContext
@@ -15,6 +17,7 @@ from control_tower.config import Settings
 from control_tower.conversations import ConversationMessage
 from control_tower.embeddings import OpenAIEmbeddingProvider
 from control_tower.integrations.risk_mcp_client import RiskMCPConnector
+from control_tower.limits import RunBudget, RunLimitExceeded
 from control_tower.observability import ExecutionTrace
 from control_tower.retrieval import HybridDocumentRetriever
 
@@ -29,6 +32,8 @@ class AgentRunResponse:
     tool_events: list[ToolEvent]
     response_id: str | None
     integrations: dict[str, dict[str, object]] = field(default_factory=dict)
+    usage: dict[str, object] = field(default_factory=dict)
+    observed_references: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -36,6 +41,8 @@ class AgentRunResponse:
             "tool_events": [asdict(event) for event in self.tool_events],
             "response_id": self.response_id,
             "integrations": self.integrations,
+            "usage": self.usage,
+            "observed_references": self.observed_references,
         }
 
 
@@ -90,6 +97,47 @@ class AgentService:
         history: list[ConversationMessage] | None = None,
         trace: ExecutionTrace | None = None,
     ) -> AgentRunResponse:
+        budget = RunBudget(self.settings.run_limits)
+        try:
+            async with asyncio.timeout(self.settings.run_limits.timeout_seconds):
+                return await self._ask(
+                    session,
+                    access,
+                    question=question,
+                    as_of=as_of,
+                    history=history,
+                    trace=trace,
+                    budget=budget,
+                )
+        except TimeoutError as exc:
+            budget.stopped_reason = "Run time limit reached."
+            raise RunLimitExceeded(budget.stopped_reason) from exc
+        except asyncio.CancelledError:
+            budget.stopped_reason = "Run cancelled."
+            raise
+        finally:
+            if trace is not None:
+                if budget.stopped_reason:
+                    trace.fail_open_operations(budget.stopped_reason)
+                trace.info(
+                    event_type="usage",
+                    node="supervisor",
+                    source="application",
+                    label="Run usage",
+                    details=budget.summary(),
+                )
+
+    async def _ask(
+        self,
+        session: Session,
+        access: AccessContext,
+        *,
+        question: str,
+        as_of: date,
+        history: list[ConversationMessage] | None,
+        trace: ExecutionTrace | None,
+        budget: RunBudget,
+    ) -> AgentRunResponse:
         if not os.getenv("OPENAI_API_KEY"):
             raise MissingOpenAIConfiguration(
                 "OPENAI_API_KEY is not configured. Add it to .env before using LLM chat."
@@ -111,21 +159,48 @@ class AgentService:
             as_of=as_of,
             retriever=HybridDocumentRetriever(session, embedding_provider),
             trace=trace,
+            budget=budget,
         )
         prompt = self._build_prompt(question, runtime, history or [])
         try:
-            result = await Runner.run(
-                self.supervisor,
-                prompt,
-                context=runtime,
-                max_turns=SUPERVISOR_MAX_TURNS,
-            )
+            async with AsyncOpenAI(
+                timeout=self.settings.run_limits.request_timeout_seconds,
+                max_retries=0,
+            ) as client:
+                result = await Runner.run(
+                    self.supervisor,
+                    prompt,
+                    context=runtime,
+                    max_turns=SUPERVISOR_MAX_TURNS,
+                    run_config=RunConfig(
+                        model_provider=OpenAIProvider(openai_client=client),
+                        trace_include_sensitive_data=False,
+                    ),
+                )
+            budget.check()
+            output = self._coerce_output(result.final_output)
+            if set(output.citations) - runtime.observed_references:
+                raise ValueError("Final answer cites evidence not returned by this run's tools.")
         except Exception:
             if trace is not None:
                 trace.fail_open_operations("Agent run failed")
             raise
-        output = self._coerce_output(result.final_output)
         if trace is not None:
+            trace.complete(
+                node="review",
+                label="Final structured answer validated",
+                details={
+                    "decision": "evidence_sufficient",
+                    "output_validated": True,
+                    "caveat_count": len(output.caveats),
+                    "specialists": sorted(trace.completed_specialists),
+                },
+            )
+            trace.complete(
+                node="supervisor",
+                label="Supervisor completed",
+                details={"citation_count": len(output.citations), "output_validated": True},
+            )
             trace.start(
                 event_type="answer",
                 node="answer",
@@ -156,6 +231,8 @@ class AgentService:
             tool_events=list(runtime.events),
             response_id=getattr(result, "last_response_id", None),
             integrations={"external_risk_mcp": self.mcp_status},
+            usage=budget.summary(),
+            observed_references=sorted(runtime.observed_references),
         )
 
     @staticmethod
@@ -183,10 +260,11 @@ class AgentService:
     @staticmethod
     def _coerce_output(value: object) -> OperationsAnswer:
         if isinstance(value, OperationsAnswer):
-            return value
+            value = value.model_dump()
         if isinstance(value, str):
-            try:
-                return OperationsAnswer.model_validate_json(value)
-            except ValidationError:
-                return OperationsAnswer(answer=value)
-        return OperationsAnswer.model_validate(value)
+            output = OperationsAnswer.model_validate_json(value)
+        else:
+            output = OperationsAnswer.model_validate(value)
+        if not output.answer.strip():
+            raise ValueError("The supervisor returned an empty answer.")
+        return output

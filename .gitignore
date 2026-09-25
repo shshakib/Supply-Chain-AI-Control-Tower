@@ -19,6 +19,7 @@ __pycache__/
 .coverage
 htmlcov/
 *.log
+*.dump
 
 # Local databases and sidecar files
 *.db

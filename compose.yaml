@@ -18,9 +18,8 @@ services:
       - control_tower_postgres:/var/lib/postgresql/data
 
   migrate:
-    image: supply-chain-ai-control-tower:local
-    build:
-      context: .
+    image: ${CONTROL_TOWER_IMAGE:-supply-chain-ai-control-tower:local}
+    pull_policy: never
     command: ["control-tower", "migrate"]
     environment:
       DATABASE_URL: postgresql+psycopg://control_tower:control_tower@db:5432/control_tower
@@ -29,9 +28,8 @@ services:
         condition: service_healthy
 
   seed:
-    image: supply-chain-ai-control-tower:local
-    build:
-      context: .
+    image: ${CONTROL_TOWER_IMAGE:-supply-chain-ai-control-tower:local}
+    pull_policy: never
     command: ["control-tower", "seed", "--if-empty"]
     environment:
       DATABASE_URL: postgresql+psycopg://control_tower:control_tower@db:5432/control_tower
@@ -41,9 +39,8 @@ services:
         condition: service_completed_successfully
 
   risk-feed:
-    image: supply-chain-ai-control-tower:local
-    build:
-      context: .
+    image: ${CONTROL_TOWER_IMAGE:-supply-chain-ai-control-tower:local}
+    pull_policy: never
     command:
       - control-tower-risk-mcp
       - --host
@@ -63,7 +60,7 @@ services:
       retries: 10
 
   web:
-    image: supply-chain-ai-control-tower:local
+    image: ${CONTROL_TOWER_IMAGE:-supply-chain-ai-control-tower:local}
     build:
       context: .
     command: ["control-tower-web", "--host", "0.0.0.0", "--port", "8000"]
@@ -78,6 +75,14 @@ services:
       CONTROL_TOWER_CONTRACTS_MODEL: ${CONTROL_TOWER_CONTRACTS_MODEL:-}
       CONTROL_TOWER_EMBEDDING_MODEL: ${CONTROL_TOWER_EMBEDDING_MODEL:-text-embedding-3-small}
       CONTROL_TOWER_EMBEDDING_DIMENSIONS: ${CONTROL_TOWER_EMBEDDING_DIMENSIONS:-384}
+      CONTROL_TOWER_TIMEOUT_SECONDS: ${CONTROL_TOWER_TIMEOUT_SECONDS:-180}
+      CONTROL_TOWER_REQUEST_TIMEOUT_SECONDS: ${CONTROL_TOWER_REQUEST_TIMEOUT_SECONDS:-30}
+      CONTROL_TOWER_MAX_MODEL_CALLS: ${CONTROL_TOWER_MAX_MODEL_CALLS:-24}
+      CONTROL_TOWER_MAX_TOTAL_TOKENS: ${CONTROL_TOWER_MAX_TOTAL_TOKENS:-60000}
+      CONTROL_TOWER_MAX_OUTPUT_TOKENS: ${CONTROL_TOWER_MAX_OUTPUT_TOKENS:-3000}
+      CONTROL_TOWER_MAX_COST_USD: ${CONTROL_TOWER_MAX_COST_USD:-0}
+      CONTROL_TOWER_INPUT_USD_PER_MILLION: ${CONTROL_TOWER_INPUT_USD_PER_MILLION:-0}
+      CONTROL_TOWER_OUTPUT_USD_PER_MILLION: ${CONTROL_TOWER_OUTPUT_USD_PER_MILLION:-0}
       CONTROL_TOWER_RISK_MCP_ENABLED: "true"
       CONTROL_TOWER_RISK_MCP_URL: http://risk-feed:8010/mcp
     ports:

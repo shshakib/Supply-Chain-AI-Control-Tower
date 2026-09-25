@@ -3,13 +3,16 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
 from control_tower import __version__
 from control_tower.agent_service import AgentRunResponse
 from control_tower.agents.llm import OperationsAnswer
 from control_tower.agents.runtime import ToolEvent
 from control_tower.config import get_settings
+from control_tower.limits import RunLimitExceeded
+from control_tower.models import DocumentChunk
 from control_tower.web import create_app
 
 
@@ -50,6 +53,41 @@ class FakeAgentService:
             ],
             response_id="resp_test",
         )
+
+
+def test_budget_failure_is_visible_in_http_and_stream(engine: Engine) -> None:
+    class LimitedService(FakeAgentService):
+        async def ask(self, *_args, **_kwargs):
+            raise RunLimitExceeded("Run token budget reached.")
+
+    app = create_app(settings=get_settings(), engine=engine, agent_service=LimitedService())
+    request = {"question": "Check shipments", "user_email": "noah.east@controltower.demo"}
+    with TestClient(app) as client:
+        response = client.post("/api/chat", json=request)
+        assert response.status_code == 429
+        assert response.json()["detail"] == "Run token budget reached."
+        events = _parse_sse(client.post("/api/chat/stream", json=request).text)
+        assert not any(name == "result" for name, _payload in events)
+        assert any(name == "error" for name, _payload in events)
+
+
+def test_health_counts_only_compatible_embeddings(engine: Engine) -> None:
+    settings = get_settings()
+    # Bind the app to one uncommitted transaction so this fixture leaves no stored vectors.
+    with engine.connect() as connection, connection.begin() as transaction:
+        with Session(bind=connection) as session:
+            chunks = list(session.scalars(select(DocumentChunk).limit(3)))
+            for chunk in chunks:
+                chunk.embedding = [1.0] * settings.embedding_dimensions
+            chunks[0].embedding_model = settings.embedding_model
+            chunks[0].embedding_dimensions = settings.embedding_dimensions
+            chunks[1].embedding_model = "old-model"
+            chunks[1].embedding_dimensions = settings.embedding_dimensions
+            session.flush()
+            app = create_app(settings=settings, engine=connection, agent_service=FakeAgentService())
+            with TestClient(app) as client:
+                assert client.get("/api/health").json()["indexed_chunks"] == 1
+        transaction.rollback()
 
 
 def test_web_chat_persists_scoped_conversation(engine: Engine) -> None:
