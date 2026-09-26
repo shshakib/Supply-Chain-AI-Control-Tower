@@ -193,3 +193,15 @@ work; synchronous database operations also need database-side timeouts in a shar
 Final citations must match references returned by tools in the current run. This verifies provenance,
 not that every claim is supported by the cited text. Run limits and validation failures never produce
 a successful final answer.
+
+## Common Setup Issues
+
+- **Command or module not found:** activate `.venv` and run `python -m pip install -e ".[dev]"`
+  from the project root. The Python package is named `control_tower`.
+- **Port 8000 already in use:** stop the previous server or use `--port 8001` with the Python web
+  command. For Docker, set `CONTROL_TOWER_WEB_PORT=8001` in `.env`.
+- **An existing database needs upgrading:** Docker applies migrations on startup. For SQLite,
+  run `python -m control_tower.cli --database-url "sqlite:///./control_tower.db" migrate`.
+  Re-run indexing after embedding model changes; it uses paid API calls.
+- **MCP is offline:** start the risk service. Live agents can continue with local evidence,
+  but external disruption information will be unavailable.

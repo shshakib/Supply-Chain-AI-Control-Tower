@@ -15,16 +15,21 @@ source code or real business data.
 
 ## A Look Inside
 
-**An operational answer with its execution map.**
+**An investigation with its live execution map.**
 
-![Operations console showing an offline supply-risk answer and completed execution map](docs/images/operations-console.png)
+![Dark-mode console showing a live shipment investigation and specialist execution map](docs/images/operations-console.png)
 
 **The evidence behind the answer, with tool results and source references.**
 
 ![Dark-mode console showing tool evidence and grouped citations](docs/images/evidence-and-citations.png)
 
-These screenshots show the built-in offline scenario, not a live LLM run. It reads the synthetic
-data without an API key. Live chat uses the same interface with model-driven routing and answers.
+These screenshots are from real LLM runs using synthetic data, PostgreSQL, document retrieval,
+and the external-risk MCP server.
+
+**[Watch the demo (2 min 43 sec)](docs/media/control-tower-demo.mp4)**
+
+The silent walkthrough covers two questions, agent exchanges, the timeline, citations, and usage
+estimates. It uses actual dark-mode UI captures, with waiting periods shortened for the video.
 
 ## How It Works
 
@@ -217,26 +222,7 @@ Container Registry (GHCR). Normal pushes do not publish or deploy it.
 
 In VS Code, open the repository folder, install the Python dependencies above, then use
 **Terminal > Run Task**. `Ctrl+Shift+B` starts the SQLite web app and MCP service together.
-[Task list, dataset, personas, and implementation notes](docs/REFERENCE.md)
+[Task list, dataset, personas, and setup troubleshooting](docs/REFERENCE.md)
 
-## Common Setup Issues
-
-- **Command or module not found:** activate `.venv` and run `python -m pip install -e ".[dev]"`
-  from the project root. The Python package is named `control_tower`.
-- **Port 8000 already in use:** stop the previous server or use `--port 8001` with the Python web
-  command. For Docker, set `CONTROL_TOWER_WEB_PORT=8001` in `.env`.
-- **An existing database needs upgrading:** Docker applies migrations on startup. For SQLite,
-  run `python -m control_tower.cli --database-url "sqlite:///./control_tower.db" migrate`.
-  Re-run indexing after embedding model changes; it uses paid API calls.
-- **MCP is offline:** start the risk service. Live agents can continue with local evidence,
-  but external disruption information will be unavailable.
-
-## What Is Still Missing?
-
-The main local workflow is implemented. Public hosting still needs real authentication, per-user
-rate/concurrency limits, account-wide spending protection, HTTPS, managed secrets, and private
-database/MCP networking. Backups need a tested restore procedure, and operational alerts need to
-be configured. Live-model evaluations should be run against the chosen model profile before release.
-
-The checked-in database credentials are disposable local-demo values. Do not expose this stack
-unchanged to the internet. See the [deployment checklist](docs/DEPLOYMENT.md) for the remaining work.
+Built for local demos. Public hosting requires real authentication and additional security controls.
+See the [deployment guide](docs/DEPLOYMENT.md#before-public-hosting).

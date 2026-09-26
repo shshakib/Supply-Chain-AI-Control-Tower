@@ -63,6 +63,8 @@ representative answers is still required before release. Evaluations are not run
 
 ## Before Public Hosting
 
+The main local workflow is implemented. The following work remains before public hosting:
+
 - Real identity verification, tenant binding, and authorization at every API boundary.
 - HTTPS, secure secret storage, non-demo database credentials, and private database/MCP networking.
 - Per-user rate limits, concurrency limits, and provider/account-level spending controls.
